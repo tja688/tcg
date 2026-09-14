@@ -22,6 +22,7 @@ const sources = { llm: 0, fake: 0 };
 let hudRef = null;
 let pulseId = null;
 let dots = 3;
+let sidecarLive = false;
 
 function prefersReduce() {
   return globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
@@ -40,7 +41,13 @@ export function thinkSources() {
     llm: sources.llm,
     fake: sources.fake,
     active: sources.llm > 0 || sources.fake > 0,
+    sidecarLive,
   };
+}
+
+export function setLlmThinkHud(on) {
+  sidecarLive = !!on;
+  syncThinkHud();
 }
 
 export function bindThinkHud(hud) {
@@ -75,7 +82,7 @@ function stopPulse() {
 }
 
 function syncThinkHud() {
-  if (thinkSources().active) startPulse();
+  if (sidecarLive && thinkSources().active) startPulse();
   else {
     stopPulse();
     hudRef?.showLlmThink?.('');
@@ -98,6 +105,7 @@ export function endThink(source) {
 export function resetThinkHud(hud) {
   sources.llm = 0;
   sources.fake = 0;
+  sidecarLive = false;
   stopPulse();
   (hud || hudRef)?.showLlmThink?.('');
 }

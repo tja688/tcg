@@ -9,6 +9,7 @@ import {
   thinkFallback,
 } from './voice.js';
 import { IDLE_MUTTER, mutterOnce, probeLlm, REACT_MUTTER, THINK_MUTTER } from './llm.js';
+import { setLlmThinkHud } from './think.js';
 import { peekPlan } from './tactics.js';
 
 const COOLDOWN = {
@@ -82,6 +83,11 @@ export function createBanter({ hud, director }) {
     lastTouch = performance.now();
   }
 
+  function setLive(on) {
+    live = !!on;
+    setLlmThinkHud(live);
+  }
+
   function canIdle(game) {
     if (disposed || !game || game.over || game.turn !== 'player') return false;
     if (director?.busy) return false;
@@ -115,11 +121,13 @@ export function createBanter({ hud, director }) {
       thoughtGen = 0;
       disposed = false;
       gen += 1;
+      setLive(false);
       touch();
     },
     dispose() {
       disposed = true;
       gen += 1;
+      setLive(false);
       stopIdle();
       hud?.hideEnemyBanter?.();
     },
@@ -130,7 +138,7 @@ export function createBanter({ hud, director }) {
     },
     stopIdle,
     async prepare() {
-      live = await probeLlm(800);
+      setLive(await probeLlm(800));
       return live;
     },
     async speak(game, ev, { force = false } = {}) {
@@ -161,7 +169,7 @@ export function createBanter({ hud, director }) {
             line = await mutterOnce({ system, user, ...spec });
             if (!isUsableLine(line, ev)) line = '';
           } catch {
-            live = false;
+            setLive(false);
           }
         }
         if (!line) line = fallbackLine(persona, ev, game);
@@ -191,7 +199,7 @@ export function createBanter({ hud, director }) {
             line = await mutterOnce({ system, user, ...THINK_MUTTER });
             if (!isUsableLine(line, { type: 'think' })) line = '';
           } catch {
-            live = false;
+            setLive(false);
           }
         }
         if (!line) line = thinkFallback(persona, game, intent, plan);

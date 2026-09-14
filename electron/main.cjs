@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, protocol, net } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
+const qwen = require('./qwen.cjs');
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -96,11 +97,19 @@ if (!gotLock) {
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
     protocol.handle('app', (request) => {
+      if (qwen.isQwenRequest(request.url)) return qwen.proxyQwen(request);
       const filePath = resolveDistFile(request.url);
       if (!filePath) return new Response('Forbidden', { status: 403 });
       return net.fetch(pathToFileURL(filePath).href);
     });
+    qwen.ensureSidecar().catch((err) => {
+      console.warn(`[qwen] sidecar not started: ${err.message}`);
+    });
     createWindow();
+  });
+
+  app.on('before-quit', () => {
+    qwen.stopSidecar();
   });
 
   app.on('window-all-closed', () => {

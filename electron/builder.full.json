@@ -1,0 +1,52 @@
+{
+  "appId": "com.arcaneduel.tcg",
+  "productName": "奥术对决",
+  "asar": true,
+  "npmRebuild": false,
+  "forceCodeSigning": false,
+  "directories": {
+    "output": "release/full",
+    "buildResources": "electron/build"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json",
+    "!node_modules/**",
+    "!.local/**",
+    "!release/**",
+    "!scripts/**"
+  ],
+  "extraResources": [
+    {
+      "from": ".local/qwen/stage/bin",
+      "to": "qwen/bin"
+    },
+    {
+      "from": ".local/qwen/models",
+      "to": "qwen/models",
+      "filter": ["Qwen3.5-2B-Q4_K_M.gguf"]
+    }
+  ],
+  "win": {
+    "icon": "electron/build/icon.png",
+    "signAndEditExecutable": false,
+    "artifactName": "ArcaneDuel-${version}-with-qwen-win-x64.${ext}",
+    "target": [
+      {
+        "target": "zip",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "奥术对决",
+    "uninstallDisplayName": "奥术对决",
+    "artifactName": "ArcaneDuel-${version}-with-qwen-Setup.exe"
+  }
+}

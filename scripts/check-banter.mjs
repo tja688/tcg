@@ -5,7 +5,7 @@ import { sanitizeLine } from '../src/pseudoai/llm.js';
 import { isUsableLine, takeSpoken, buildSpeechPrompt, buildThinkPrompt, fallbackLine } from '../src/pseudoai/voice.js';
 import { personaOf } from '../src/pseudoai/personas.js';
 import { peekPlan } from '../src/pseudoai/tactics.js';
-import { beginThink, endThink, resetThinkHud, thinkSources } from '../src/pseudoai/think.js';
+import { beginThink, endThink, resetThinkHud, setLlmThinkHud, thinkSources } from '../src/pseudoai/think.js';
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
@@ -88,9 +88,14 @@ const oldSlice = CLIP.slice(0, 28).replace(/[，,、；;：:\s]+$/, '');
   const logs = [];
   const hud = { showLlmThink(t) { logs.push(t || ''); } };
   resetThinkHud(hud);
+  beginThink('fake', hud);
+  ok(thinkSources().fake === 1, 'fake source still counts without sidecar');
+  ok(!logs.some(Boolean), 'qwen think hint hidden when sidecar is down');
+  endThink('fake');
+  setLlmThinkHud(true);
   beginThink('llm', hud);
-  ok(thinkSources().active, 'llm source shows overlay');
-  ok(logs.some(Boolean), 'overlay painted on first source');
+  ok(thinkSources().active, 'llm source shows overlay when sidecar is live');
+  ok(logs.some((t) => String(t).includes('Qwen3.5-2B')), 'overlay names the local model');
   beginThink('fake', hud);
   ok(thinkSources().llm === 1 && thinkSources().fake === 1, 'both sources counted');
   endThink('llm');
@@ -98,6 +103,10 @@ const oldSlice = CLIP.slice(0, 28).replace(/[，,、；;：:\s]+$/, '');
   endThink('fake');
   ok(!thinkSources().active, 'off when last source ends');
   ok(logs[logs.length - 1] === '', 'overlay cleared on last end');
+  beginThink('fake', hud);
+  setLlmThinkHud(false);
+  ok(logs[logs.length - 1] === '', 'hint hides if sidecar dies mid-think');
+  endThink('fake');
   resetThinkHud(hud);
 }
 
