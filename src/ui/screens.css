@@ -205,6 +205,17 @@
   color: #d2c8e4;
 }
 
+.titleActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.titlePanel .titleActions .ghostBtn {
+  min-width: 220px;
+}
+
 .titlePanel .goldBtn.cta {
   position: relative;
   overflow: visible;
@@ -644,8 +655,122 @@
   content: none;
 }
 
-body[data-mode="title"] #deckBtn,
-body[data-mode="title"] #restartBtn,
+.goPanel .goActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px 18px;
+  margin-top: 22px;
+}
+
+.goPanel .goActions .goldBtn,
+.goPanel .goActions .ghostBtn {
+  margin-top: 0;
+}
+
+#settingsRoot {
+  position: fixed;
+  inset: 0;
+  z-index: 36;
+  pointer-events: none;
+}
+
+#settingsRoot.open {
+  pointer-events: auto;
+}
+
+#settingsRoot .floatLayer {
+  position: absolute;
+}
+
+#settingsRoot .settingsSheet {
+  width: min(560px, 92vw);
+}
+
+#settingsRoot .settingsSheet .body {
+  margin-bottom: 8px;
+}
+
+.volRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 8px;
+  margin-top: 18px;
+  color: #efe6d0;
+}
+
+.volName {
+  letter-spacing: 0.16em;
+  font-size: 13px;
+  color: #ffe9b8;
+}
+
+.volVal {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  color: #f2d089;
+}
+
+.volRow input[type="range"] {
+  grid-column: 1 / -1;
+}
+
+.settingsMute {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.settingsActs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dangerBtn {
+  color: #ffb09f;
+}
+
+.volRow input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border: none;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f2d089, rgba(242, 208, 137, 0.22));
+  outline: none;
+}
+
+.volRow input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff3cf;
+  box-shadow: 0 0 10px rgba(242, 208, 137, 0.7);
+  cursor: pointer;
+}
+
+.volRow input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: #fff3cf;
+  box-shadow: 0 0 10px rgba(242, 208, 137, 0.7);
+  cursor: pointer;
+}
+
+body[data-mode="title"] #topBtns,
 body[data-mode="title"] #hint,
 body[data-mode="map"] #hint,
 body[data-mode="event"] #hint,

@@ -46,13 +46,20 @@ export class Screens {
     this.assets = assets;
     this._resolver = null;
     this.veil = new SceneVeil(document.getElementById('sceneVeil'));
+    this.settingsRoot = document.getElementById('settingsRoot');
     this._onKey = (e) => {
-      if (e.key === 'Escape') this.closeDeck();
+      if (e.key !== 'Escape') return;
+      if (this.settingsRoot?.querySelector('[data-screen="settings"]')) {
+        this.closeSettings();
+        return;
+      }
+      this.closeDeck();
     };
     document.addEventListener('keydown', this._onKey);
   }
 
   clear() {
+    this.closeSettings();
     this.closeDeck();
     this.root.classList.remove('active');
     this.root.innerHTML = '';
@@ -60,6 +67,7 @@ export class Screens {
   }
 
   open(html) {
+    this.closeSettings();
     this.closeDeck();
     this.root.classList.add('active');
     this.root.innerHTML = html;
@@ -67,8 +75,11 @@ export class Screens {
   }
 
   async present(html, meta = {}) {
-    if (!meta.soft && !this.veil.covered) await this.veil.cover(meta);
-    else if (this.veil.covered && meta.title) this.veil.setKind(meta.kind, meta.title);
+    if (!meta.soft && !this.veil.covered) {
+      this.sfx.cue('flow.transition');
+      await this.veil.cover(meta);
+    } else if (this.veil.covered && meta.title) this.veil.setKind(meta.kind, meta.title);
+    this.closeSettings();
     this.closeDeck();
     this.root.classList.add('active');
     this.root.innerHTML = html;
@@ -78,9 +89,12 @@ export class Screens {
   }
 
   async depart(meta = {}) {
+    this.closeSettings();
     this.closeDeck();
-    if (!this.veil.covered) await this.veil.cover(meta);
-    else if (meta.title) this.veil.setKind(meta.kind, meta.title);
+    if (!this.veil.covered) {
+      this.sfx.cue('flow.transition');
+      await this.veil.cover(meta);
+    } else if (meta.title) this.veil.setKind(meta.kind, meta.title);
     this.clear();
   }
 
@@ -89,6 +103,16 @@ export class Screens {
   }
 
   playEnter(kind) {
+    const enterCue = {
+      title: 'flow.map',
+      map: 'flow.map',
+      shop: 'flow.shop.enter',
+      event: 'flow.event',
+      rest: 'flow.rest',
+      treasure: 'flow.treasure',
+      reward: 'flow.reward',
+    }[kind];
+    if (enterCue) this.sfx.cue(enterCue);
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
     const panel = this.root.querySelector('.panel');
     if (!panel) return;
@@ -129,17 +153,128 @@ export class Screens {
           <h1>暮光回廊</h1>
           <div class="titleRule"></div>
           <p class="lead">一幕短征程。分支地图、遭遇、商店与篝火，最终对上深渊魔王。</p>
-          <button class="goldBtn cta" data-testid="start-run" type="button">开启远征</button>
+          <div class="titleActions">
+            <button class="goldBtn cta" data-testid="start-run" type="button">开启远征</button>
+            <button class="ghostBtn" data-testid="open-settings" type="button">设置</button>
+          </div>
           <p class="titleHint">拖拽手牌召唤 · 瞄准随从攻击 · 金色符印或空格结束回合</p>
         </div>
       </div>`, { soft: true, kind: 'title' });
     return new Promise((resolve) => {
       this.root.querySelector('[data-testid="start-run"]').onclick = async () => {
-        this.sfx.click();
+        this.sfx.cue('ui.start');
+        this.sfx.cue('flow.transition');
         await this.veil.cover({ title: '暮光回廊', kind: 'map' });
         resolve();
       };
+      this.root.querySelector('[data-testid="open-settings"]').onclick = () => {
+        this.sfx.cue('ui.menu.open');
+        this.openSettings();
+      };
     });
+  }
+
+  toggleSettings() {
+    if (this.settingsRoot?.querySelector('[data-screen="settings"]')) {
+      this.closeSettings();
+      return;
+    }
+    this.sfx.cue('ui.menu.open');
+    this.openSettings();
+  }
+
+  openSettings() {
+    const root = this.settingsRoot;
+    if (!root || root.querySelector('[data-screen="settings"]')) return;
+    const bgmPct = Math.round((this.sfx.bgmVolume ?? 0.5) * 100);
+    const sfxPct = Math.round((this.sfx.sfxVolume ?? 0.8) * 100);
+    const inRun = !['title', 'loading'].includes(document.body.dataset.mode || 'title');
+    root.classList.add('open');
+    root.innerHTML = `
+      <div class="floatLayer" data-screen="settings">
+        <article class="sheet settingsSheet">
+          <div class="sheetHead">
+            <h3>设置</h3>
+            <button class="ghostBtn" type="button" data-act="close">关闭</button>
+          </div>
+          <p class="body">分别调整背景音乐与音效。下次进入游戏仍会记住。</p>
+          <label class="volRow">
+            <span class="volName">背景音乐</span>
+            <input type="range" min="0" max="100" step="1" value="${bgmPct}" data-vol="bgm" aria-label="背景音乐音量">
+            <span class="volVal" data-val="bgm">${bgmPct}%</span>
+          </label>
+          <label class="volRow">
+            <span class="volName">音效</span>
+            <input type="range" min="0" max="100" step="1" value="${sfxPct}" data-vol="sfx" aria-label="音效音量">
+            <span class="volVal" data-val="sfx">${sfxPct}%</span>
+          </label>
+          <div class="settingsMute">
+            <span class="volName">音效开关</span>
+            <button class="ghostBtn" type="button" data-act="mute">
+              <span class="btnLabel">${this.sfx.muted ? '音效：关' : '音效：开'}</span>
+            </button>
+          </div>
+          ${inRun ? `<div class="settingsActs">
+            <button class="ghostBtn" type="button" data-act="deck">查看牌库</button>
+            <button class="ghostBtn dangerBtn" type="button" data-act="abandon">放弃对局</button>
+          </div>` : ''}
+        </article>
+      </div>`;
+    const bind = (name, setter) => {
+      const input = root.querySelector(`[data-vol="${name}"]`);
+      const label = root.querySelector(`[data-val="${name}"]`);
+      input.addEventListener('input', () => {
+        const v = Number(input.value);
+        label.textContent = `${v}%`;
+        setter(v / 100);
+        if (name === 'sfx') this.sfx.cue('ui.toggle');
+      });
+    };
+    bind('bgm', (v) => this.sfx.setBgmVolume(v));
+    bind('sfx', (v) => this.sfx.setSfxVolume(v));
+    const muteBtn = root.querySelector('[data-act="mute"]');
+    const syncMute = () => {
+      const label = muteBtn.querySelector('.btnLabel');
+      const text = this.sfx.muted ? '音效：关' : '音效：开';
+      if (label) label.textContent = text;
+      else muteBtn.textContent = text;
+    };
+    muteBtn.onclick = () => {
+      this.sfx.toggleMute();
+      syncMute();
+    };
+    const deckBtn = root.querySelector('[data-act="deck"]');
+    if (deckBtn) {
+      deckBtn.onclick = () => {
+        this.sfx.cue('ui.page');
+        this.closeSettings();
+        if (this.hud.onDeck) this.hud.onDeck();
+      };
+    }
+    const abandonBtn = root.querySelector('[data-act="abandon"]');
+    if (abandonBtn) {
+      abandonBtn.onclick = () => {
+        this.sfx.cue('ui.cancel');
+        this.closeSettings();
+        if (this.hud.onAbandon) this.hud.onAbandon();
+        else location.href = location.pathname;
+      };
+    }
+    root.querySelector('[data-act="close"]').onclick = () => {
+      this.sfx.cue('ui.cancel');
+      this.closeSettings();
+    };
+    root.querySelector('.floatLayer').addEventListener('click', (e) => {
+      if (e.target.closest('.settingsSheet')) return;
+      this.closeSettings();
+    });
+  }
+
+  closeSettings() {
+    const root = this.settingsRoot;
+    if (!root) return;
+    root.classList.remove('open');
+    root.innerHTML = '';
   }
 
   async showMap(run, handlers) {
@@ -163,6 +298,7 @@ export class Screens {
       const def = getCard(id);
       if (def) row.appendChild(thumb(def, this.assets, 132));
     });
+    this.sfx.cue('ui.page');
     this.root.appendChild(wrap);
     this.root.querySelector('.mapPanel')?.classList.add('deckOpen');
     wrap.querySelector('[data-act="close"]').onclick = () => this.closeDeck();
@@ -188,10 +324,10 @@ export class Screens {
         btn.dataset.cardId = id;
         btn.dataset.index = String(i);
         btn.appendChild(thumb(def, this.assets, 132));
-        btn.onclick = () => { this.sfx.click(); wrap.remove(); resolve(id); };
+        btn.onclick = () => { this.sfx.cue('card.select'); wrap.remove(); resolve(id); };
         row.appendChild(btn);
       });
-      wrap.querySelector('[data-act="skip"]').onclick = () => { wrap.remove(); resolve(null); };
+      wrap.querySelector('[data-act="skip"]').onclick = () => { this.sfx.cue('ui.cancel'); wrap.remove(); resolve(null); };
       this.root.appendChild(wrap);
     });
   }
@@ -224,12 +360,12 @@ export class Screens {
         btn.onclick = async () => {
           if (btn.disabled) {
             this.hud.toast(opt.disabledHint || '无法选择');
-            this.sfx.error();
+            this.sfx.cue('ui.reject');
             btn.classList.add('shake');
             setTimeout(() => btn.classList.remove('shake'), 400);
             return;
           }
-          this.sfx.click();
+          this.sfx.cue('ui.confirm');
           col.querySelectorAll('button').forEach((b) => { b.disabled = true; });
           const result = await handlers.choose(opt, i);
           resultBox.hidden = false;
@@ -240,7 +376,7 @@ export class Screens {
             return;
           }
           cont.hidden = false;
-          cont.onclick = () => { this.sfx.click(); resolve(result); };
+          cont.onclick = () => { this.sfx.cue('ui.confirm'); resolve(result); };
         };
         col.appendChild(btn);
       });
@@ -298,12 +434,13 @@ export class Screens {
           const r = handlers.buyCard(item);
           if (!r.ok) {
             this.hud.toast(r.reason);
-            this.sfx.error();
+            this.sfx.cue(r.reason?.includes('金') ? 'shop.insufficient' : 'ui.reject');
             cell.classList.add('shake');
             setTimeout(() => cell.classList.remove('shake'), 400);
             return;
           }
-          this.sfx.chime();
+          this.sfx.cue('shop.buy');
+          this.sfx.goldSpend();
           item.sold = true;
           cell.classList.add('sold');
           cell.disabled = true;
@@ -326,12 +463,14 @@ export class Screens {
         const r = handlers.buyRelic();
         if (!r.ok) {
           this.hud.toast(r.reason);
-          this.sfx.error();
+          this.sfx.cue(r.reason?.includes('金') ? 'shop.insufficient' : 'ui.reject');
           btn.classList.add('shake');
           setTimeout(() => btn.classList.remove('shake'), 400);
           return;
         }
-        this.sfx.chime();
+        this.sfx.cue('shop.buy');
+        this.sfx.cue('reward.relic');
+        this.sfx.goldSpend();
         btn.disabled = true;
         btn.querySelector('small').textContent = '已售出';
         paintGold();
@@ -345,7 +484,7 @@ export class Screens {
       if (shop.removed) return;
       if (run.gold < shop.removePrice) {
         this.hud.toast('金币不足，无法删牌');
-        this.sfx.error();
+        this.sfx.cue('shop.insufficient');
         btn.classList.add('shake');
         setTimeout(() => btn.classList.remove('shake'), 400);
         return;
@@ -356,7 +495,8 @@ export class Screens {
         if (r.reason) this.hud.toast(r.reason);
         return;
       }
-      this.sfx.chime();
+      this.sfx.cue('shop.remove');
+      this.sfx.goldSpend();
       btn.disabled = true;
       btn.querySelector('small').textContent = '已经用过';
       paintGold();
@@ -368,12 +508,13 @@ export class Screens {
       const r = handlers.refresh();
       if (!r.ok) {
         this.hud.toast(r.reason);
-        this.sfx.error();
+        this.sfx.cue(r.reason?.includes('金') ? 'shop.insufficient' : 'ui.reject');
         btn.classList.add('shake');
         setTimeout(() => btn.classList.remove('shake'), 400);
         return;
       }
-      this.sfx.click();
+      this.sfx.cue('shop.refresh');
+      this.sfx.goldSpend();
       shop = r.shop;
       drawCards();
       btn.disabled = true;
@@ -383,7 +524,7 @@ export class Screens {
 
     return new Promise((resolve) => {
       leaveBtn.onclick = () => {
-        this.sfx.click();
+        this.sfx.cue('ui.cancel');
         resolve();
       };
     });
@@ -401,7 +542,7 @@ export class Screens {
       </div>`, { title: '余烬篝火', kind: 'rest' });
     return new Promise((resolve) => {
       this.root.querySelector('[data-act="heal"]').onclick = () => {
-        this.sfx.chime();
+        this.sfx.cue('rest.heal');
         onRest();
         this.hud.refreshRun?.(run);
         this.hud.toast(`生命上限提高了 ${gainAmt} 点`);
@@ -428,7 +569,7 @@ export class Screens {
     return new Promise((resolve) => {
       const finish = (cardId) => {
         handlers.take(cardId);
-        this.sfx.chime();
+        this.sfx.cue(cardId ? 'reward.claim' : 'reward.abandon');
         resolve(cardId);
       };
       (reward.cards || []).forEach((id) => {
@@ -460,7 +601,7 @@ export class Screens {
       </div>`, { title: '匣中遗珍', kind: 'treasure' });
     return new Promise((resolve) => {
       this.root.querySelector('[data-act="take"]').onclick = () => {
-        this.sfx.chime();
+        this.sfx.cue('ui.confirm');
         onTake();
         resolve();
       };
@@ -468,6 +609,7 @@ export class Screens {
   }
 
   async showRunOver(win, run) {
+    if (win) this.sfx.cue('flow.victory.run');
     await this.present(`
       <div class="panel dim goPanel ${win ? 'win' : 'lose'}" data-screen="runover">
         <article class="sheet">
@@ -476,15 +618,28 @@ export class Screens {
     ? '深渊魔王倒下。暮光回廊暂时安静下来。'
     : '晨曦法师倒在回廊里。牌库散落一地。'}</p>
           <p class="meta">金币 ${run.gold} · 牌库 ${run.deck.length} · 遗物 ${run.relics.length} · 胜场 ${run.combatsWon}</p>
-          <button class="goldBtn" type="button" data-testid="new-run">再启远征</button>
+          <div class="goActions">
+            <button class="goldBtn" type="button" data-testid="new-run">再启远征</button>
+            <button class="ghostBtn" type="button" data-testid="back-title">返回主菜单</button>
+          </div>
         </article>
       </div>`, { title: win ? '远征完成' : '远征失败', kind: win ? 'win' : 'lose' });
     return new Promise((resolve) => {
-      this.root.querySelector('[data-testid="new-run"]').onclick = async () => {
-        this.sfx.click();
-        await this.veil.cover({ title: '再启远征', kind: 'map' });
-        resolve();
+      let done = false;
+      const pick = async (action, cover) => {
+        if (done) return;
+        done = true;
+        this.sfx.cue(action === 'restart' && win ? 'ui.start' : 'ui.confirm');
+        this.sfx.cue('flow.transition');
+        await this.veil.cover(cover);
+        resolve(action);
       };
+      this.root.querySelector('[data-testid="new-run"]').onclick = () => pick('restart', {
+        title: '再启远征', kind: 'map',
+      });
+      this.root.querySelector('[data-testid="back-title"]').onclick = () => pick('title', {
+        title: '暮光回廊', kind: 'title',
+      });
     });
   }
 }

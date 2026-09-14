@@ -18,8 +18,13 @@ export const THINK = {
   dotsMs: 380,
 };
 
+const sources = { llm: 0, fake: 0 };
+let hudRef = null;
+let pulseId = null;
+let dots = 3;
+
 function prefersReduce() {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  return globalThis.window?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
 }
 
 export function thinkSpan(kind, firstOfTurn) {
@@ -30,20 +35,76 @@ export function thinkSpan(kind, firstOfTurn) {
   return reduce ? ms : Math.max(THINK.minMs, ms);
 }
 
-function startThinkPulse(hud) {
-  const base = THINK.label;
-  let n = 3;
-  hud?.showLlmThink?.(`${base}...`);
-  const id = setInterval(() => {
-    n = (n + 1) % 4;
-    hud?.showLlmThink?.(`${base}${'.'.repeat(n)}`);
+export function thinkSources() {
+  return {
+    llm: sources.llm,
+    fake: sources.fake,
+    active: sources.llm > 0 || sources.fake > 0,
+  };
+}
+
+export function bindThinkHud(hud) {
+  hudRef = hud || null;
+}
+
+function paintThink() {
+  if (!hudRef) return;
+  if (!thinkSources().active) {
+    hudRef.showLlmThink?.('');
+    return;
+  }
+  hudRef.showLlmThink?.(`${THINK.label}${'.'.repeat(dots)}`);
+}
+
+function startPulse() {
+  if (pulseId) return;
+  dots = 3;
+  paintThink();
+  pulseId = setInterval(() => {
+    dots = (dots + 1) % 4;
+    paintThink();
   }, THINK.dotsMs);
-  return () => clearInterval(id);
+}
+
+function stopPulse() {
+  if (pulseId) {
+    clearInterval(pulseId);
+    pulseId = null;
+  }
+  dots = 3;
+}
+
+function syncThinkHud() {
+  if (thinkSources().active) startPulse();
+  else {
+    stopPulse();
+    hudRef?.showLlmThink?.('');
+  }
+}
+
+export function beginThink(source, hud) {
+  if (hud) hudRef = hud;
+  if (source !== 'llm' && source !== 'fake') return;
+  sources[source] += 1;
+  syncThinkHud();
+}
+
+export function endThink(source) {
+  if (source !== 'llm' && source !== 'fake') return;
+  sources[source] = Math.max(0, sources[source] - 1);
+  syncThinkHud();
+}
+
+export function resetThinkHud(hud) {
+  sources.llm = 0;
+  sources.fake = 0;
+  stopPulse();
+  (hud || hudRef)?.showLlmThink?.('');
 }
 
 export async function fakeThink(hud, kind, firstOfTurn, ctx = {}) {
   const delay = thinkSpan(kind, firstOfTurn);
-  const stopPulse = startThinkPulse(hud);
+  beginThink('fake', hud);
   let shownAt = 0;
 
   const speakP = (async () => {
@@ -63,7 +124,6 @@ export async function fakeThink(hud, kind, firstOfTurn, ctx = {}) {
       if (remain > 0) await sleep(remain);
     }
   } finally {
-    stopPulse();
-    hud?.showLlmThink?.('');
+    endThink('fake');
   }
 }

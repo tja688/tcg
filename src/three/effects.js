@@ -214,7 +214,7 @@ export class Effects {
     const light = new THREE.PointLight(color, element === 'shadow' ? 18 : 36, 9, 1.9);
     group.add(light);
     this.scene.add(group);
-    this.sfx.cast();
+    this.sfx.cue('sfx.effect.whoosh');
 
     const ctrl = from.clone().add(to).multiplyScalar(0.5).add(new THREE.Vector3(0, arc, 0));
     const curve = new THREE.QuadraticBezierCurve3(from.clone(), ctrl, to.clone());
@@ -240,7 +240,14 @@ export class Effects {
     });
 
     this.impact(to, color, 1.45 * size, { element });
-    this.sfx.boom();
+    const impactCue = {
+      fire: 'sfx.spell.fire',
+      shadow: 'sfx.spell.shadow',
+      lightning: 'sfx.spell.lightning',
+      holy: 'sfx.spell.holy',
+      frost: 'battle.combat.armor_gain',
+    }[element] || 'sfx.spell.explode';
+    this.sfx.cue(impactCue);
     if (size >= 1.1) await this.screen()?.hitStop(40);
     gsap.to(light, {
       intensity: 0, duration: 0.28,
@@ -289,7 +296,7 @@ export class Effects {
 
   // ---- 闪电打击 ----
   async lightning(to) {
-    this.sfx.zap();
+    this.sfx.cue('sfx.spell.lightning');
     const bolts = [
       this._mkBolt(to, { radius: 0.06, opacity: 1, color: 0xe8f4ff }),
       this._mkBolt(to, { radius: 0.16, opacity: 0.32, color: 0x8ec8ff }),
@@ -334,7 +341,7 @@ export class Effects {
 
   // ---- 圣击（金光落雷）----
   async holyBolt(to) {
-    this.sfx.zap();
+    this.sfx.cue('sfx.spell.holy');
     const bolts = [
       this._mkBolt(to, { radius: 0.05, opacity: 1, color: 0xfff4c8, jitter: 0.45, segs: 6 }),
       this._mkBolt(to, { radius: 0.14, opacity: 0.3, color: 0xffd166, jitter: 0.55, segs: 6 }),
@@ -358,7 +365,7 @@ export class Effects {
 
   // ---- 治疗 ----
   async heal(pos) {
-    this.sfx.chime();
+    this.sfx.cue('battle.combat.heal');
     const glowMat = new THREE.SpriteMaterial({
       map: this.assets.glowTex, color: 0xffe9a8, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false,
@@ -398,7 +405,7 @@ export class Effects {
 
   // ---- 霜盾 / 护甲 ----
   async frostShield(pos) {
-    this.sfx.chime();
+    this.sfx.cue('battle.combat.armor_gain');
     const ringGeo = new THREE.TorusGeometry(0.85, 0.07, 8, 48);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x8fe4ff, transparent: true, opacity: 0.85,
@@ -497,8 +504,8 @@ export class Effects {
   }
 
   // ---- 奥术施法涟漪 ----
-  async flourish(pos, color = 0xb45cff) {
-    this.sfx.cast();
+  async flourish(pos, color = 0xb45cff, { cue = 'sfx.spell.arcane' } = {}) {
+    this.sfx.cue(cue);
     const ringMat = new THREE.MeshBasicMaterial({
       color, transparent: true, opacity: 0.7,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
@@ -518,7 +525,7 @@ export class Effects {
   }
 
   async shadowDrain(pos) {
-    this.sfx.cast();
+    this.sfx.cue('sfx.spell.shadow');
     this.particles.sink(pos, { count: 16, color: 0x8a4cff, size: 0.2, life: 0.9, speed: 1.3 });
     this.screen()?.punch({ tint: 0x6a2cff, tintAmt: 0.2, vignette: 0.12, flash: 0.03 });
     await new Promise((r) => setTimeout(r, 280));

@@ -79,6 +79,8 @@ src/
 │   ├── shop.js / rewards.js / relics.js
 ├── pseudoai/
 │   ├── brain.js         # 敌方出牌和攻击（不读预兆，不用 LLM）
+│   ├── tactics.js       # 选牌分数，并给台词暴露下一步打算
+│   ├── voice.js         # 提示词：说人话，不硬切半句
 │   └── banter.js        # 台词。LLM 挂了就走本地句子
 ├── three/director.js    # fx 实现 + 玩家入口（canAct / busy）
 ├── ui/                  # 标题、地图、商店、HUD

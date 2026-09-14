@@ -29,9 +29,7 @@ body {
 .ghostBtn,
 .choiceBtn,
 #topBtns .iconBtn,
-#muteBtn,
-#deckBtn,
-#restartBtn {
+#settingsBtn {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
@@ -71,9 +69,7 @@ body {
 
 .ghostBtn,
 #topBtns .iconBtn,
-#muteBtn,
-#deckBtn,
-#restartBtn {
+#settingsBtn {
   padding: 4px 12px;
   min-height: 44px;
   font-size: 13px;
@@ -90,9 +86,7 @@ body {
 }
 
 #topBtns .iconBtn,
-#muteBtn,
-#deckBtn,
-#restartBtn {
+#settingsBtn {
   padding: 3px 10px;
   min-height: 42px;
   font-size: 12.5px;
@@ -153,9 +147,7 @@ body {
 #gameover button:hover,
 .ghostBtn:hover,
 #topBtns .iconBtn:hover,
-#muteBtn:hover,
-#deckBtn:hover,
-#restartBtn:hover,
+#settingsBtn:hover,
 .choiceBtn:hover:not(:disabled) {
   transform: translateY(-2px);
   filter: brightness(1.1) saturate(1.08);
@@ -224,9 +216,9 @@ body {
 }
 
 /* HUD 芯片：hud_chip 九宫底板，去掉圆角玻璃 */
-#turnPill,
 #runStrip .stat,
-#enemyHud,
+.enemyPlate,
+#enemyBanter.show,
 #aimHint,
 #toast {
   border-radius: 0;
@@ -244,31 +236,30 @@ body {
   font-family: var(--font-serif), var(--font-ui);
 }
 
-#turnPill {
-  padding: 6px 22px;
-  min-width: 220px;
-  min-height: 42px;
-  text-align: center;
-  letter-spacing: 0.22em;
-  color: #e8dcb8;
-}
-
-#turnPill.enemy {
-  color: #ff9d8f;
-  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #2a1014 0%, #14080c 72%);
-}
-
 #runStrip .stat {
-  min-width: 92px;
-  padding: 8px 20px;
-  text-align: center;
+  min-width: 0;
+  padding: 8px 16px;
+  text-align: left;
   letter-spacing: 0.1em;
   color: #efe6d0;
 }
 
-#enemyHud {
-  padding: 6px 20px;
+#runStrip .dockMain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.45;
+}
+
+#runRelics {
+  align-self: flex-end;
+}
+
+.enemyPlate {
+  padding: 6px 16px 6px 10px;
   color: #efe6d0;
+  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #1a1018 0%, #0c080e 72%);
 }
 
 #llmThink {
@@ -405,8 +396,14 @@ body {
 .restPanel .goldBtn,
 .treasurePanel .goldBtn,
 .goPanel .goldBtn,
+.goPanel .ghostBtn,
 .rewardPanel .ghostBtn {
   margin-top: 18px;
+}
+
+.goPanel .goActions .goldBtn,
+.goPanel .goActions .ghostBtn {
+  margin-top: 0;
 }
 
 #gameover .inner.sheet {
@@ -426,11 +423,22 @@ body {
 
 #enemyBanter {
   border-radius: 0;
-  background: rgba(16, 8, 14, 0.88);
-  border: 1px solid rgba(242, 208, 137, 0.32);
-  box-shadow:
-    0 10px 26px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 1px rgba(255, 140, 110, 0.12);
+  overflow: hidden;
+  white-space: normal;
+}
+#enemyBanter.show {
+  overflow: visible;
+  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #1a1016 0%, #0c080e 76%);
+}
+#enemyBanter.show::after {
+  content: "";
+  position: absolute;
+  right: -10px;
+  top: 18px;
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+  border-left-color: rgba(242, 208, 137, 0.55);
 }
 
 @media (max-width: 900px) {

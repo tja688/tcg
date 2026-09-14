@@ -38,6 +38,10 @@ export function eventLine(ev) {
   switch (ev.type) {
     case 'think':
       return intentLine(ev);
+    case 'idle':
+      return '对手还在想，场面暂时安静。';
+    case 'draw':
+      return ev.card ? `你摸到了「${ev.card}」。` : '你摸了一张牌。';
     case 'turn_start':
       return `轮到你行动了（第 ${ev.turnNo || '?'} 回合）。`;
     case 'play': {

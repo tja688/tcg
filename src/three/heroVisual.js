@@ -68,7 +68,11 @@ export class HeroVisual {
     }));
     this.hpSprite.scale.set(1.05, 1.05, 1);
     if (side === 'player') this.hpSprite.position.set(-1.55, 0.3, 0.25);
-    else this.hpSprite.position.set(1.58, 1.22, 0.28);
+    else {
+      // 敌方面上血量会被手牌挡住，改由左侧 2D HUD 显示
+      this.hpSprite.position.set(-1.62, 0.18, 0.28);
+      this.hpSprite.visible = false;
+    }
     this.group.add(this.hpSprite);
     this.paintHp();
 

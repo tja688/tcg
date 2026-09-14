@@ -114,6 +114,7 @@ export class InputController {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') {
         if (this.mode) this.cancelDrag('已收回');
+        else if (this.hud.onSettings) this.hud.onSettings();
         return;
       }
       if (!this.enabled) return;
@@ -318,7 +319,7 @@ export class InputController {
         this.hoveredTarget = target;
         if (target) {
           d.hoverTargetMark(target, true);
-          this.sfx.hover();
+          this.sfx.hover('target');
           this.updateAimPreview(target);
         } else {
           this.hud.setAimHint?.(this.mode === 'attack' ? '指向或点击合法目标' : '点击或指向法术目标');
@@ -342,7 +343,7 @@ export class InputController {
     if (newHover !== d.hoverInst) {
       d.hoverInst = newHover;
       d.layoutHand();
-      if (newHover) this.sfx.hover();
+      if (newHover) this.sfx.hover('card');
     }
     if (newHover) {
       d.setBoardHover(null);
@@ -475,7 +476,7 @@ export class InputController {
       this.hud.setAimHint?.('拖向战场中央施放');
     }
     d.layoutHand();
-    this.sfx.pickup();
+    this.sfx.pickup('card');
   }
 
   beginAttack(e, inst) {
@@ -488,7 +489,7 @@ export class InputController {
     this.arrowFrom.copy(d.posOf(inst)).add(new THREE.Vector3(0, 0.5, 0));
     this.validTargets = this.game.validAttackTargets(inst);
     for (const t of this.validTargets) d.markValidTarget(t, true);
-    this.sfx.pickup();
+    this.sfx.pickup('attack');
     this.setCursor('crosshair');
     this.hud.setAimHint?.('点击或指向合法目标攻击');
   }
@@ -518,6 +519,7 @@ export class InputController {
       d.clearAllHighlights();
       d.layoutHand();
       d.layoutBoard('player');
+      if (dragged || msg) this.sfx.cue('card.drag.return');
       if (msg) this.hud.toast(msg);
     };
 

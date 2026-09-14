@@ -1,54 +1,97 @@
 const DEFAULT = {
-  voice: '冷静、克制，像在低声自语',
-  ticks: ['……', '有意思。', '继续。'],
+  voice: '普通、清楚，像对面坐着一个会说话的对手',
+  habit: 'plain',
+  tic: '',
+  ticks: ['嗯…', '你出啊。', '我看着呢。'],
+};
+
+const HABIT_HINT = {
+  plain: '正常说话，别耍花样。',
+  invert: '偶尔倒装，例如「石垒卫，我先放下。」不要句句倒装。',
+  giggle: '句尾偶尔加「咯咯」，大约三句里用一次。',
+  mix_en: '偶尔夹一个很短的英文词，例如 face、nice，不要整句英文。',
+  heat: '急性子，句子短，但仍是完整的人话。',
+  tease: '喜欢损对面一句，带着笑。',
+  loud: '嗓门大，像在喊，但仍能听懂。',
+  scheme: '喜欢把下一步漏一点，别说成清单。',
+  tempo: '干脆，语速快，不拖泥带水。',
+  cold: '轻声，带点嘲讽。',
+  vow: '短而稳，像在立誓。',
+  whisper: '小声，像从暗处探头。',
 };
 
 export const PERSONAS = {
   ashen_pack: {
-    voice: '焦躁、嗜血，短句像火星迸溅，不讲道理只催命',
-    ticks: ['烧起来。', '再近点。', '面门空了。'],
+    voice: '急性子，句子短，催着对面出牌',
+    habit: 'heat',
+    tic: '',
+    ticks: ['还磨蹭？', '面门空着。', '烧起来了。'],
   },
   crystal_warden: {
-    voice: '沉、慢、像石头在说话，讲究守势与分寸',
-    ticks: ['先立住。', '墙还在。', '别急。'],
+    voice: '沉稳，像石头慢慢开口，句子完整',
+    habit: 'invert',
+    tic: '就这样。',
+    ticks: ['墙还在。', '你急什么。', '先立住。'],
   },
   venom_adept: {
-    voice: '阴柔、带着笑意，喜欢用毒与削弱调侃对手',
-    ticks: ['味道对了。', '再蚀一层。', '你会软下来。'],
+    voice: '带着笑，喜欢损人',
+    habit: 'tease',
+    tic: '呵。',
+    ticks: ['味道对了。', '再蚀一层。', '你会软下来的。'],
   },
   drum_brute: {
-    voice: '粗声、兴奋，满口战鼓与力气',
-    ticks: ['再响一点！', '打得就是爽。', '跟着鼓点。'],
+    voice: '大声、兴奋，像跟着鼓点喊',
+    habit: 'loud',
+    tic: '哈！',
+    ticks: ['打得就是爽！', '再响一点！', '跟着鼓点！'],
   },
   void_weaver: {
-    voice: '文绉绉、疏离，像在织一张看不见的网',
-    ticks: ['线收紧了。', '这步在我算中。', '虚空会记着。'],
+    voice: '慢条斯理，喜欢把下一步漏一点',
+    habit: 'scheme',
+    tic: '',
+    ticks: ['线在收。', '这步我算过。', '别急着看下一张。'],
   },
   storm_vanguard: {
-    voice: '干脆、节奏快，像雷声未落刀已出鞘',
+    voice: '干脆，语速快，不拖泥带水',
+    habit: 'tempo',
+    tic: '',
     ticks: ['跟得上吗。', '节奏是我的。', '下一刀。'],
   },
   dusk_slayer: {
-    voice: '冷、轻、带着处刑者的戏谑',
+    voice: '轻声，带着处刑者的嘲讽',
+    habit: 'cold',
+    tic: '',
     ticks: ['夜还长。', '别眨眼。', '颈侧空了。'],
   },
   bastion_saint: {
-    voice: '庄重、短促，像誓言，不浪费一个字',
-    ticks: ['壁垒不倒。', '圣壁还在。', '站稳。'],
+    voice: '短而稳，像誓言，不浪费字',
+    habit: 'vow',
+    tic: '',
+    ticks: ['壁垒不倒。', '站稳。', '圣壁还在。'],
   },
   rot_whelp: {
-    voice: '幼龙般的嘶声，贪婪，带着未长成的凶性',
-    ticks: ['再热一点。', '血味。', '我想咬。'],
+    voice: '幼龙，贪，未长成的凶性',
+    habit: 'giggle',
+    tic: '咯咯。',
+    ticks: ['血味。', '我想咬。', '再热一点。'],
   },
   abyss_lord: {
-    voice: '低沉、傲慢，偶尔像深渊在回响，不屑解释',
+    voice: '傲慢，偶尔中英夹杂一个词',
+    habit: 'mix_en',
+    tic: '',
     ticks: ['跪下。', '深渊睁眼了。', '叫吧。'],
   },
   ambush_shade: {
-    voice: '窃窃、短促，像从暗处探出头',
-    ticks: ['嘘。', '来晚了。', '影子先到。'],
+    voice: '小声，像从暗处探头',
+    habit: 'whisper',
+    tic: '嘘。',
+    ticks: ['来晚了。', '影子先到。', '别出声。'],
   },
 };
+
+export function habitHint(habit) {
+  return HABIT_HINT[habit] || HABIT_HINT.plain;
+}
 
 export function personaOf(encounter) {
   const id = encounter?.id || '';
@@ -60,6 +103,8 @@ export function personaOf(encounter) {
     blurb: encounter?.blurb || '',
     archetype: encounter?.archetype || 'tempo',
     voice: p.voice,
+    habit: p.habit || 'plain',
+    tic: p.tic || '',
     ticks: p.ticks,
   };
 }

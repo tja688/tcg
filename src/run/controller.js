@@ -38,11 +38,13 @@ export class RunController {
     this.screens = new Screens(document.getElementById('overlayRoot'), hud, sfx, assets);
     this.hud.onAbandon = () => this.abandon();
     this.hud.onDeck = () => { if (this.run) this.screens.showDeck(this.run); };
+    this.hud.onSettings = () => this.screens.toggleSettings();
   }
 
   async boot(autostart = false) {
     this.input.enabled = false;
     this.hud.setMode('title');
+    this.sfx.bgm.setScene('title');
     if (!autostart) await this.screens.showTitle();
     await this.beginRun();
   }
@@ -61,6 +63,7 @@ export class RunController {
     this.game = null;
     this.input.game = null;
     this.hud.setMode('map');
+    this.sfx.bgm.setScene('map');
     this.hud.refreshRun(this.run);
     await this.screens.showMap(this.run, {
       onNode: (id) => this.enter(id),
@@ -113,6 +116,7 @@ export class RunController {
     const encounter = getEncounter(encounterId);
     this.run.hp = this.run.maxHp;
     this.hud.setMode('combat');
+    this.sfx.bgm.setScene(kind === 'boss' ? 'boss' : kind === 'elite' ? 'elite' : 'combat');
     this.hud.refreshRun(this.run);
     this.director.teardownCombat();
     const game = new Game(this.director, this.rng, {
@@ -128,6 +132,7 @@ export class RunController {
     this.input.enabled = true;
     const sess = attachPseudoAI({ hud: this.hud, director: this.director, encounter });
     void sess.prepare();
+    this.director.combatKind = kind;
     this.director.onCombatEnd = (winner) => this.afterCombat(winner, kind);
     await this.screens.unveil();
     await this.director.startGame();
@@ -153,9 +158,14 @@ export class RunController {
     completeCurrent(this.run);
     const reward = makeCombatReward(this.run, kind, this.rng);
     applyGold(this.run, reward.gold);
-    if (reward.relic) grantRelic(this.run, reward.relic);
+    this.sfx.goldGain(reward.gold);
+    if (reward.relic) {
+      grantRelic(this.run, reward.relic);
+      this.sfx.cue('reward.relic');
+    }
     this.hud.refreshRun(this.run);
     this.hud.setMode('reward');
+    this.sfx.bgm.setScene('reward');
     await this.screens.depart({ title: '战利品', kind: 'reward' });
     await this.screens.showReward(reward, this.run, {
       take: (cardId) => {
@@ -169,6 +179,7 @@ export class RunController {
   async openEvent(eventId) {
     const ev = getEvent(eventId);
     this.hud.setMode('event');
+    this.sfx.bgm.setScene('map');
     const ctxBase = {
       rng: this.rng,
       grantRelic: () => {
@@ -209,6 +220,7 @@ export class RunController {
 
   async openShop() {
     this.hud.setMode('shop');
+    this.sfx.bgm.setScene('shop');
     let shop = generateShop(this.run, this.rng);
     this.run.shop = shop;
     await this.screens.showShop(this.run, shop, {
@@ -223,6 +235,7 @@ export class RunController {
 
   async openRest() {
     this.hud.setMode('rest');
+    this.sfx.bgm.setScene('rest');
     const gain = restMaxHpAmount(this.run);
     await this.screens.showRest(this.run, gain, () => {
       addMaxHp(this.run, gain);
@@ -233,10 +246,15 @@ export class RunController {
 
   async openTreasure() {
     this.hud.setMode('treasure');
+    this.sfx.bgm.setScene('map');
     const reward = makeTreasureReward(this.run, this.rng);
     await this.screens.showTreasure(reward, this.run, () => {
       applyGold(this.run, reward.gold);
-      if (reward.relic) grantRelic(this.run, reward.relic);
+      this.sfx.goldGain(reward.gold);
+      if (reward.relic) {
+        grantRelic(this.run, reward.relic);
+        this.sfx.cue('reward.relic');
+      }
       this.hud.refreshRun(this.run);
     });
     completeCurrent(this.run);
@@ -245,17 +263,28 @@ export class RunController {
 
   async finishRun(win) {
     this.input.enabled = false;
+    detachPseudoAI();
     this.director.teardownCombat();
+    this.game = null;
+    this.input.game = null;
     this.hud.setMode('runover');
+    this.sfx.bgm.setScene(win ? 'win' : 'lose');
     await this.screens.depart({ title: win ? '远征完成' : '远征失败', kind: win ? 'win' : 'lose' });
-    await this.screens.showRunOver(win, this.run);
+    const next = await this.screens.showRunOver(win, this.run);
     this.seed = ((this.seed * 1103515245) + 12345) >>> 0;
+    if (next === 'title') {
+      this.run = null;
+      this.hud.setMode('title');
+      this.sfx.bgm.setScene('title');
+      await this.screens.showTitle();
+    }
     await this.beginRun();
   }
 
   abandon() {
     if (this._ending) return;
     this._ending = true;
+    this.sfx.cue('flow.abandon');
     const next = this.run ? this.finishRun(false) : this.beginRun();
     return Promise.resolve(next).finally(() => { this._ending = false; });
   }

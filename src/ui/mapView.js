@@ -219,10 +219,11 @@ function lockMarch(screens, panel, on) {
   });
 }
 
-function marchPawn(pawn, from, ctrl, to, onDone) {
+function marchPawn(pawn, from, ctrl, to, onDone, sfx) {
   const proxy = { t: 0 };
   const dur = marchDuration(from, to);
   let done = false;
+  let lastStep = -1;
   const finish = () => {
     if (done) return;
     done = true;
@@ -244,6 +245,11 @@ function marchPawn(pawn, from, ctrl, to, onDone) {
     overwrite: true,
     onUpdate() {
       setPawnAt(pawn, bezier2(from, ctrl, to, proxy.t));
+      const step = Math.floor(proxy.t / 0.18);
+      if (step !== lastStep) {
+        lastStep = step;
+        sfx?.cue('avatar.walk.step');
+      }
     },
     onComplete: finish,
   });
@@ -253,7 +259,7 @@ function bindMap(screens, run, pos, edges, { onNode, onDeck }) {
   const tip = screens.root.querySelector('.mapTip');
   const panel = screens.root.querySelector('.mapPanel');
   const pawn = screens.root.querySelector('.mapPawn');
-  screens.root.querySelector('[data-act="deck"]').onclick = () => { screens.sfx.click(); onDeck(); };
+  screens.root.querySelector('[data-act="deck"]').onclick = () => { onDeck(); };
 
   screens.root.querySelectorAll('[data-node-id]').forEach((btn) => {
     btn.onmouseenter = () => {
@@ -295,7 +301,7 @@ function bindMap(screens, run, pos, edges, { onNode, onDeck }) {
       marchPawn(pawn, from, ctrl, dest, () => {
         if (!pawn.isConnected) return;
         onNode(id);
-      });
+      }, screens.sfx);
     };
   });
 }

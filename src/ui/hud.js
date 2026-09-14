@@ -1,10 +1,20 @@
 import { getRelic } from '../run/relics.js';
+import { resetThinkHud } from '../pseudoai/think.js';
+import { imageSrc } from '../utils/assets.js';
+
+const INTENT_ICON = {
+  attack: '⚔',
+  defend: '🛡',
+  buff: '▲',
+  debuff: '▼',
+  summon: '✦',
+  special: '✶',
+};
 
 export class Hud {
   constructor() {
     this.banner$ = document.getElementById('banner');
     this.toast$ = document.getElementById('toast');
-    this.pill$ = document.getElementById('turnPill');
     this.go$ = document.getElementById('gameover');
     this.goTitle$ = document.getElementById('goTitle');
     this.goSub$ = document.getElementById('goSub');
@@ -16,14 +26,13 @@ export class Hud {
     this.gold$ = document.getElementById('runGold');
     this.floor$ = document.getElementById('runFloor');
     this.relics$ = document.getElementById('runRelics');
-    this.piles$ = document.getElementById('pileHud');
-    this.pDeck$ = document.getElementById('pDeck');
-    this.pDisc$ = document.getElementById('pDisc');
-    this.pHand$ = document.getElementById('pHand');
     this.aim$ = document.getElementById('aimHint');
     this.enemyHud$ = document.getElementById('enemyHud');
+    this.enemyHudPortrait$ = document.getElementById('enemyHudPortrait');
     this.enemyHudName$ = document.getElementById('enemyHudName');
     this.enemyHudHp$ = document.getElementById('enemyHudHp');
+    this.enemyHudHpFill$ = document.getElementById('enemyHudHpFill');
+    this.enemyHudArmor$ = document.getElementById('enemyHudArmor');
     this.enemyHudIntent$ = document.getElementById('enemyHudIntent');
     this.str$ = document.getElementById('strHud');
     this.llmThink$ = document.getElementById('llmThink');
@@ -32,20 +41,15 @@ export class Hud {
     this.banterText$ = document.getElementById('enemyBanterText');
     this._banterTimer = null;
     this._intent = null;
-    this._enemy = { name: '', hp: 0, maxHp: 0, armor: 0 };
+    this._enemy = { name: '', hp: 0, maxHp: 0, armor: 0, portrait: '' };
 
     this._toastTimer = null;
     this._bannerTimer = null;
     this.onAbandon = null;
     this.onDeck = null;
+    this.onSettings = null;
+    this.sfx = null;
 
-    document.getElementById('restartBtn').addEventListener('click', () => {
-      if (this.onAbandon) this.onAbandon();
-      else location.href = location.pathname;
-    });
-    document.getElementById('deckBtn').addEventListener('click', () => {
-      if (this.onDeck) this.onDeck();
-    });
     const goBtn = document.getElementById('goBtn');
     if (goBtn) goBtn.addEventListener('click', () => {
       if (this.onAbandon) this.onAbandon();
@@ -54,15 +58,13 @@ export class Hud {
   }
 
   bindSfx(sfx) {
-    const btn = document.getElementById('muteBtn');
-    const sync = () => {
-      const text = sfx.muted ? '音效：关' : '音效：开';
-      const label = btn.querySelector('.btnLabel');
-      if (label) label.textContent = text;
-      else btn.textContent = text;
-    };
-    btn.addEventListener('click', () => { sfx.toggleMute(); sync(); });
-    sync();
+    this.sfx = sfx;
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        if (this.onSettings) this.onSettings();
+      });
+    }
   }
 
   loadProgress(p) {
@@ -78,20 +80,11 @@ export class Hud {
   setMode(mode) {
     document.body.dataset.mode = mode;
     const combat = mode === 'combat';
-    this.piles$.classList.toggle('show', combat);
     if (!combat) this.setEnemyStatus({ name: '', intent: null });
-    if (mode === 'map') this.pill$.textContent = '选择下一处落脚';
-    if (mode === 'title') this.pill$.textContent = '远征准备中…';
-    if (mode === 'shop') this.pill$.textContent = '暮光货栈';
-    if (mode === 'event') this.pill$.textContent = '回廊事件';
-    if (mode === 'rest') this.pill$.textContent = '余烬篝火';
-    if (mode === 'treasure') this.pill$.textContent = '发现宝藏';
-    if (mode === 'reward') this.pill$.textContent = '拾取战利品';
-    if (mode === 'runover') this.pill$.textContent = '远征结束';
     this.runStrip$.classList.toggle('show', mode !== 'title' && mode !== 'loading');
     if (mode !== 'combat') {
       this.setAimHint('');
-      this.showLlmThink('');
+      resetThinkHud(this);
       this.hideEnemyBanter();
     }
   }
@@ -107,11 +100,7 @@ export class Hud {
     }).join('') || '<span class="muted">无遗物</span>';
   }
 
-  setPiles(deck, disc, hand) {
-    this.pDeck$.textContent = String(deck);
-    this.pDisc$.textContent = String(disc);
-    this.pHand$.textContent = String(hand);
-  }
+  setPiles() {}
 
   setIntent(intent) {
     this.setEnemyStatus({ intent: intent || null });
@@ -123,22 +112,37 @@ export class Hud {
     if ('hp' in partial) this._enemy.hp = partial.hp;
     if ('maxHp' in partial) this._enemy.maxHp = partial.maxHp;
     if ('armor' in partial) this._enemy.armor = partial.armor || 0;
+    if ('portrait' in partial) this._enemy.portrait = partial.portrait || '';
     this.refreshEnemyStatus();
   }
 
   refreshEnemyStatus() {
     if (!this.enemyHud$) return;
-    const { name, hp, maxHp, armor } = this._enemy;
+    const { name, hp, maxHp, armor, portrait } = this._enemy;
     const show = document.body.dataset.mode === 'combat' && !!name;
     this.enemyHud$.classList.toggle('show', show);
     if (!show) return;
     if (this.enemyHudName$) this.enemyHudName$.textContent = name;
-    if (this.enemyHudHp$) {
-      this.enemyHudHp$.textContent = armor ? `${hp}/${maxHp} · 甲${armor}` : `${hp}/${maxHp}`;
+    if (this.enemyHudPortrait$) {
+      const src = imageSrc(portrait);
+      if (src && this.enemyHudPortrait$.getAttribute('src') !== src) {
+        this.enemyHudPortrait$.src = src;
+      }
+      this.enemyHudPortrait$.alt = name;
+      this.enemyHudPortrait$.hidden = !src;
     }
+    const ratio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
+    if (this.enemyHudHpFill$) this.enemyHudHpFill$.style.width = `${Math.round(ratio * 100)}%`;
+    if (this.enemyHudHp$) this.enemyHudHp$.textContent = `${hp}/${maxHp}`;
+    if (this.enemyHudArmor$) {
+      this.enemyHudArmor$.textContent = armor ? `甲 ${armor}` : '';
+      this.enemyHudArmor$.hidden = !armor;
+    }
+    this.enemyHud$.classList.toggle('low', hp <= 10 || ratio <= 0.3);
     if (this.enemyHudIntent$) {
       const intent = this._intent;
-      const label = intent ? `${intent.title} · ${intent.label}` : '';
+      const icon = intent ? (INTENT_ICON[intent.type] || '✶') : '';
+      const label = intent ? `${icon} ${intent.title} · ${intent.label}` : '';
       this.enemyHudIntent$.textContent = label;
       this.enemyHudIntent$.hidden = !label;
     }
@@ -161,19 +165,12 @@ export class Hud {
     this.llmThink$.classList.toggle('show', !!text);
   }
 
-  showEnemyBanter(text, who, xy, opts) {
+  showEnemyBanter(text, who, _xy, opts) {
     if (!this.banter$ || !text) return;
-    if (this.banterWho$) this.banterWho$.textContent = who || '';
+    if (this.banterWho$) this.banterWho$.textContent = who || this._enemy.name || '';
     if (this.banterText$) this.banterText$.textContent = text;
-    if (xy && Number.isFinite(xy.x) && Number.isFinite(xy.y)) {
-      const x = Math.min(window.innerWidth - 36, Math.max(window.innerWidth * 0.62, xy.x + 96));
-      const y = Math.min(window.innerHeight * 0.32, Math.max(86, xy.y - 8));
-      this.banter$.style.left = `${x}px`;
-      this.banter$.style.top = `${y}px`;
-    } else {
-      this.banter$.style.left = '72%';
-      this.banter$.style.top = '18%';
-    }
+    this.banter$.style.left = '';
+    this.banter$.style.top = '';
     this.banter$.classList.add('show');
     clearTimeout(this._banterTimer);
     const hold = Number.isFinite(opts?.holdMs) ? opts.holdMs : 3200;
@@ -204,16 +201,7 @@ export class Hud {
     this._toastTimer = setTimeout(() => el.classList.remove('show'), 1700);
   }
 
-  setTurnPill(turnNo, turn, over) {
-    if (over) return;
-    if (turn === 'none' || turnNo === 0) {
-      this.pill$.textContent = '对决开始';
-      this.pill$.classList.remove('enemy');
-      return;
-    }
-    this.pill$.textContent = `第 ${turnNo} 回合 · ${turn === 'player' ? '你的行动' : '对手行动'}`;
-    this.pill$.classList.toggle('enemy', turn === 'enemy');
-  }
+  setTurnPill() {}
 
   gameOver(win) {
     this.goTitle$.textContent = win ? '胜 利' : '战 败';
@@ -222,6 +210,5 @@ export class Hud {
       : '晨曦法师倒下了……但传说仍将继续';
     this.go$.classList.toggle('defeat', !win);
     this.go$.classList.add('show');
-    this.pill$.textContent = win ? '你赢得了对决' : '你输掉了对决';
   }
 }

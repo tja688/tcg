@@ -26,10 +26,12 @@ async function boot() {
   const fast = parseFloat(params.get('fast'));
   if (fast) gsap.globalTimeline.timeScale(fast);
 
-  const assets = await loadAssets((p) => hud.loadProgress(p));
+  const sfx = new Sfx();
+  sfx.installChrome();
+  const assets = await loadAssets((p) => hud.loadProgress(p * 0.86));
+  await sfx.preload((p) => hud.loadProgress(0.86 + p * 0.14));
 
   const world = createWorld(document.getElementById('app'), assets);
-  const sfx = new Sfx();
   hud.bindSfx(sfx);
   const particles = new ParticleSystem(world.scene, assets);
   const effects = new Effects(world, particles, assets, sfx);
@@ -50,7 +52,7 @@ async function boot() {
   };
 
   window.__tcg = {
-    director, world, seed, errors, run,
+    director, world, seed, errors, run, sfx,
     get game() { return run.game; },
     state() {
       const game = run.game;

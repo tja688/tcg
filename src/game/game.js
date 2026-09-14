@@ -8,6 +8,12 @@ import { notifyPseudoAI } from '../pseudoai/session.js';
 
 let UID = 1;
 
+function notifyTargetName(target) {
+  if (!target) return '';
+  if (target.kind === 'hero') return target.side === 'enemy' ? '你' : '那个法师';
+  return target.def?.name || '';
+}
+
 function mkHero(side, name, hp, maxHp) {
   return { kind: 'hero', side, name, hp, maxHp, armor: 0 };
 }
@@ -121,6 +127,9 @@ export class Game {
     s.hand.push(inst);
     await this.fx.drawCard(sideName, inst);
     this.fx.updatePiles?.(sideName);
+    if (sideName === 'enemy' && this.turn === 'enemy') {
+      notifyPseudoAI(this, { type: 'draw', card: def.name });
+    }
   }
 
   async startTurn(sideName) {
@@ -146,6 +155,8 @@ export class Game {
     }
 
     this.fx.refreshIndicators();
+    if (sideName === 'player') notifyPseudoAI(this, { type: 'player_turn' });
+    if (sideName === 'enemy') notifyPseudoAI(this, { type: 'enemy_turn' });
     if (sideName === 'enemy' && !this.over) {
       await this.resolveIntent(this.lockedIntent);
       if (this.over) return;
@@ -239,8 +250,14 @@ export class Game {
 
     if (await this.settle()) return true;
     this.fx.refreshIndicators();
-    if (inst.side === 'player' && (def.cost >= 4 || def.rarity === 'legendary')) {
-      notifyPseudoAI(this, { type: 'player_play', card: def.name });
+    if (inst.side === 'player') {
+      notifyPseudoAI(this, {
+        type: 'player_play',
+        card: def.name,
+        cardType: def.type,
+        cost: def.cost,
+        targetName: notifyTargetName(target),
+      });
     }
     return true;
   }
@@ -331,11 +348,12 @@ export class Game {
 
     if (await this.settle()) return true;
     this.fx.refreshIndicators();
-    if (attacker.side === 'player' && (target.kind === 'hero' || (target.kind === 'minion' && target.health <= 0))) {
+    if (attacker.side === 'player') {
       notifyPseudoAI(this, {
         type: 'player_attack',
         attackerName: attacker.def?.name,
-        targetName: target.kind === 'hero' ? '你' : target.def?.name,
+        targetName: notifyTargetName(target),
+        lethal: target.kind === 'hero' && target.hp <= 0,
       });
     }
     return true;

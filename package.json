@@ -3,20 +3,57 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
+  "author": "Arcane Duel",
   "description": "奥术对决 - Three.js 3D TCG 卡牌对战 Demo",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "electron": "electron .",
+    "dist": "node scripts/pack-portable.mjs",
     "qwen:setup": "node scripts/qwen/setup.mjs",
     "qwen:serve": "node scripts/qwen/serve.mjs",
-    "test": "node scripts/check-run-logic.mjs && node scripts/check-combat-logic.mjs"
+    "test": "node scripts/check-run-logic.mjs && node scripts/check-combat-logic.mjs && node scripts/check-banter.mjs && node scripts/check-bgm.mjs"
   },
   "dependencies": {
     "gsap": "^3.15.0",
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3",
     "vite": "^8.2.1"
+  },
+  "build": {
+    "appId": "com.arcaneduel.tcg",
+    "productName": "奥术对决",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "electron/build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "!node_modules/**"
+    ],
+    "win": {
+      "icon": "electron/build/icon.png",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": true
+    },
+    "portable": {
+      "artifactName": "ArcaneDuel-${version}-Portable.exe"
+    }
   }
 }

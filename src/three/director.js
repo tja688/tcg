@@ -11,6 +11,7 @@ import {
 } from './layout.js';
 import { DropZone } from './dropZone.js';
 import { IntentBadge } from './intentBadge.js';
+import { resetThinkHud } from '../pseudoai/think.js';
 
 const L = CFG.layout;
 
@@ -116,6 +117,7 @@ export class Director {
     this.sfx = sfx;
 
     this.game = null;
+    this.combatKind = 'combat';
     this.vis = new Map();          // uid -> CardVisual（玩家手牌 + 双方战场）
     this.enemyHandBacks = [];      // 敌方手牌（卡背）
     this.hoverInst = null;
@@ -170,6 +172,7 @@ export class Director {
       hp: hero.hp,
       maxHp: hero.maxHp,
       armor: hero.armor || 0,
+      portrait: this.game.encounter?.portrait || 'hero_warlock',
     };
     if (intent !== undefined) payload.intent = intent;
     this.hud?.setEnemyStatus?.(payload);
@@ -198,7 +201,7 @@ export class Director {
     this.world.setPlayLane?.(false);
     this.intentBadge.hide();
     this.hud?.setEnemyStatus?.({ name: '', intent: null });
-    this.hud?.showLlmThink?.('');
+    resetThinkHud(this.hud);
     this.hud?.hideEnemyBanter?.();
     this.world.screenFx?.reset();
     if (this.heroVis) {
@@ -225,7 +228,7 @@ export class Director {
   async playerEndTurn() {
     if (!this.canAct()) return false;
     this.endTurnBtn.press();
-    this.sfx.click();
+    this.sfx.cue('ui.confirm');
     return this.run(() => this.game.endTurn('player'));
   }
 
@@ -261,6 +264,7 @@ export class Director {
     if (inst) {
       const v = this.vis.get(inst.uid);
       if (v) gsap.to(v.group.scale, { x: 1.07, y: 1.07, duration: 0.16, overwrite: 'auto' });
+      this.sfx.cue('card.ground.hover');
     }
   }
 
@@ -359,6 +363,10 @@ export class Director {
     this.world.camPos.y = 22;
     this.world.camPos.z = 24;
     this.hud.setTurnPill(0, 'none', false);
+    this.sfx.cue('card.lifecycle.shuffle');
+    if (this.combatKind === 'boss') this.sfx.cue('flow.combat.boss');
+    else if (this.combatKind === 'elite') this.sfx.cue('flow.combat.elite');
+    else this.sfx.cue('flow.combat.start');
     await gsap.to(this.world.camPos, {
       y: 13.2, z: 12.2, duration: 2.0, ease: 'power3.inOut', delay: 0.15,
     });
@@ -451,6 +459,7 @@ export class Director {
 
   async drawFail(side) {
     this.hud.toast(side === 'player' ? '牌库抽空，受到疲劳伤害！' : '对手受到疲劳伤害');
+    this.sfx.cue('ui.reject');
     const dp = L.deckPos[side];
     this.particles.burst(new THREE.Vector3(dp[0], 0.6, dp[2]), {
       count: 8, speed: 1.4, color: 0x777799, size: 0.2, life: 0.7, gravity: 0.5,
@@ -560,7 +569,7 @@ export class Director {
         tl.to(v.group.rotation, { x: -0.45, y: 0, z: 0, duration: 0.26 }, 0);
         tl.to(v.group.scale, { x: 1.18, y: 1.18, z: 1, duration: 0.26 }, 0);
         await tl;
-        this.sfx.cast();
+        this.sfx.cue('sfx.spell.prep');
         this.particles.burst(v.group.position.clone(), {
           count: 18, speed: 2.8, color: inst.def.tint || 0xb45cff, size: 0.26, life: 0.6, gravity: 0.4,
         });
@@ -577,7 +586,7 @@ export class Director {
       const v = await this.revealEnemy(null, inst.def, 800);
       const rp = L.revealPos.enemy;
       this.castOrigin.enemy.set(rp[0], rp[1], rp[2]);
-      this.sfx.cast();
+      this.sfx.cue('sfx.spell.prep');
       this.particles.burst(v.group.position.clone(), {
         count: 18, speed: 2.8, color: inst.def.tint || 0xb45cff, size: 0.26, life: 0.6, gravity: 0.4,
       });
@@ -619,6 +628,7 @@ export class Director {
     const pos = this.posOf(entity).add(new THREE.Vector3(0, 0.7, 0.3));
     const heavy = n >= 6;
     this.effects.damageNumber(pos, `-${n}`, heavy ? '#ffe08a' : '#ff6a55', n);
+    this.sfx.cue('battle.combat.hp_damage');
     const away = new THREE.Vector3(0, 0.05, entity.side === 'player' ? 0.22 : -0.22);
     if (entity.kind === 'hero') {
       this.heroVis[entity.side].flashHit();
@@ -697,7 +707,7 @@ export class Director {
   async intentResolve(intent) { this.hud.toast(intent?.label || '预兆应验'); }
   async phaseChange(banner, intent) {
     this.hud.banner(banner, 'enemy');
-    this.sfx.rumble();
+    this.sfx.cue('flow.intent');
     this.world.screenFx?.punch({
       letterbox: 0.055, shake: 0.24, vignette: 0.16, tint: 0xff5040, tintAmt: 0.14, bloom: 0.12,
     });
@@ -705,21 +715,19 @@ export class Director {
     await sleep(900);
   }
   async buffEffect(target) {
-    this.sfx.chime();
-    await this.effects.flourish(this.posOf(target), 0xffd166);
+    await this.effects.flourish(this.posOf(target), 0xffd166, { cue: 'sfx.effect.buff' });
   }
   async debuffEffect(target) {
-    this.sfx.cast();
     await this.effects.shadowDrain(this.posOf(target));
   }
   async armorEffect(hero, n) {
-    this.sfx.chime();
-    this.blockPop(hero, n);
+    this.blockPop(hero, n, false);
     await this.effects.frostShield(this.posOf(hero));
   }
-  blockPop(entity, n) {
+  blockPop(entity, n, absorbSfx = true) {
     const pos = this.posOf(entity).add(new THREE.Vector3(0.2, 0.55, 0.2));
     this.effects.damageNumber(pos, `甲${n}`, '#9fd0ff', n);
+    if (absorbSfx) this.sfx.cue('battle.combat.armor_absorb');
   }
   async heroPowerVfx(kind, target) {
     const pos = this.posOf(target);
@@ -743,10 +751,10 @@ export class Director {
     this.clearAllHighlightsSafe();
     this.intentBadge.hide();
     if (winner === 'player') {
-      this.sfx.victory();
+      if (this.combatKind !== 'boss') this.sfx.cue('flow.victory.combat');
       this.effects.victoryBurst();
     } else {
-      this.sfx.defeat();
+      this.sfx.cue('flow.defeat');
       this.world.screenFx?.cinematicLose();
     }
     await sleep(650);

@@ -1,6 +1,7 @@
 import { createBanter } from './banter.js';
 import { describeTarget } from './snapshot.js';
 import { llmStatus } from './llm.js';
+import { bindThinkHud, resetThinkHud } from './think.js';
 
 let current = null;
 
@@ -17,6 +18,7 @@ export function attachPseudoAI({ hud, director, encounter }) {
   detachPseudoAI();
   const banter = createBanter({ hud, director });
   banter.bind(encounter);
+  bindThinkHud(hud);
 
   const session = {
     hud,
@@ -27,20 +29,29 @@ export function attachPseudoAI({ hud, director, encounter }) {
       return banter.prepare();
     },
     dispose() {
-      hud?.showLlmThink?.('');
+      resetThinkHud(hud);
       banter.dispose();
     },
-    async onTurnStart(game) {
-      return banter.speak(game, { type: 'turn_start', turnNo: game.turnNo });
+    async onTurnStart() {
+      return '';
     },
     async speakThink(game, intent) {
       return banter.speakThink(game, intent);
     },
     async onActed(game, ev) {
+      if ((ev?.type === 'play' || ev?.type === 'attack' || ev?.type === 'kill') && banter.skipActed()) return '';
       return banter.speak(game, ev);
     },
     notify(game, ev) {
       if (!game || !ev) return;
+      if (ev.type === 'player_turn') {
+        banter.startIdle(game);
+        return;
+      }
+      if (ev.type === 'enemy_turn') {
+        banter.stopIdle();
+        return;
+      }
       const rich = enrich(game, ev);
       void banter.speak(game, rich);
     },

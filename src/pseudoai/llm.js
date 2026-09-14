@@ -1,3 +1,6 @@
+import { beginThink, endThink } from './think.js';
+import { takeSpoken } from './voice.js';
+
 const CANDIDATES = [
   { health: '/qwen/health', chat: '/qwen/v1/chat/completions' },
   { health: 'http://127.0.0.1:8721/health', chat: 'http://127.0.0.1:8721/v1/chat/completions' },
@@ -5,13 +8,26 @@ const CANDIDATES = [
 
 const THINK_RE = /<think>[\s\S]*?<\/think>/gi;
 const SPEAKER_RE = /^(?:敌人|敌方|你|我|角色|旁白)[:：]\s*/;
-const STRIP_QUOTES = /^[「『"“'`]+|[」』"”'`]+$/g;
+const STRATEGY = /建议|应该出|推荐|最优|策略|分析|作为AI|作为人工智能|语言模型|Thinking Process/;
+
+function unwrapLine(s) {
+  const pairs = [['「', '」'], ['『', '』'], ['"', '"'], ['“', '”'], ["'", "'"], ['`', '`']];
+  for (const [a, b] of pairs) {
+    if (s.startsWith(a) && s.endsWith(b) && s.length > 2) {
+      const inner = s.slice(a.length, -b.length);
+      if (!inner.includes(a) && !inner.includes(b)) return inner;
+    }
+  }
+  return s;
+}
 
 let _ok = null;
 let _chatUrl = null;
 let _inflight = 0;
 
-export const THINK_MUTTER = { maxTokens: 48, timeoutMs: 4000 };
+export const THINK_MUTTER = { maxTokens: 72, timeoutMs: 4000 };
+export const REACT_MUTTER = { maxTokens: 56, timeoutMs: 2200 };
+export const IDLE_MUTTER = { maxTokens: 48, timeoutMs: 1800 };
 
 export function llmStatus() {
   return { ok: _ok, inflight: _inflight, url: _chatUrl };
@@ -51,19 +67,18 @@ export async function probeLlm(timeoutMs = 700) {
   return false;
 }
 
-export function sanitizeLine(raw, maxLen = 28) {
+export function sanitizeLine(raw) {
   if (!raw) return '';
   let s = String(raw).replace(THINK_RE, '').replace(/\r/g, '');
-  s = s.split('\n').map((l) => l.trim()).find(Boolean) || '';
-  s = s.replace(SPEAKER_RE, '').replace(STRIP_QUOTES, '').trim();
-  s = s.replace(/[\s。！？!?]{2,}/g, (m) => m[0]);
-  if (/建议|应该出|推荐|最优|策略|分析|作为AI|作为人工智能|语言模型|Thinking Process/.test(s)) return '';
-  if (s.length > maxLen) s = s.slice(0, maxLen).replace(/[，,、；;：:\s]+$/, '');
-  return s;
+  s = s.split('\n').map((l) => l.trim()).filter(Boolean).join('');
+  s = unwrapLine(s.replace(SPEAKER_RE, '').trim());
+  if (STRATEGY.test(s)) return '';
+  return takeSpoken(s);
 }
 
-export async function mutterOnce({ system, user, maxTokens = 40, timeoutMs = 2200 }) {
+export async function mutterOnce({ system, user, maxTokens = 56, timeoutMs = 2200 }) {
   if (!_chatUrl) await probeLlm(700);
+  if (!_chatUrl) return '';
   const urls = _chatUrl ? [_chatUrl] : CANDIDATES.map((c) => c.chat);
   const body = JSON.stringify({
     model: 'Qwen3.5-2B',
@@ -71,13 +86,14 @@ export async function mutterOnce({ system, user, maxTokens = 40, timeoutMs = 220
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    temperature: 0.95,
-    top_p: 0.9,
+    temperature: 0.82,
+    top_p: 0.88,
     max_tokens: maxTokens,
     stream: false,
     chat_template_kwargs: { enable_thinking: false },
   });
   _inflight += 1;
+  beginThink('llm');
   try {
     let lastErr = null;
     for (const url of urls) {
@@ -105,5 +121,6 @@ export async function mutterOnce({ system, user, maxTokens = 40, timeoutMs = 220
     return '';
   } finally {
     _inflight -= 1;
+    endThink('llm');
   }
 }

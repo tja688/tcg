@@ -34,6 +34,10 @@ const IMAGE_LIST = {
   pawn_player: '/assets/ui/pawn_player.png',
 };
 
+export function imageSrc(key, fallback = 'hero_warlock') {
+  return IMAGE_LIST[key] || IMAGE_LIST[fallback] || '';
+}
+
 function loadImage(url) {
   return new Promise((resolve) => {
     const img = new Image();
