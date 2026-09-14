@@ -73,11 +73,6 @@ export function computeIntent(game) {
     if (match(rule.if, ctx)) return fill(rule.intent, ctx, game);
   }
   const cycle = phase.cycle || ['attack'];
-  const raw = cycle[(Math.max(0, game.turnNo) ) % cycle.length];
+  const raw = cycle[(Math.max(0, game.turnNo)) % cycle.length];
   return fill(raw, ctx, game);
-}
-
-export function intentHint(intent) {
-  if (!intent) return '';
-  return `${intent.title} · ${intent.label}`;
 }

@@ -17,7 +17,7 @@ export const RELICS = {
   },
   iron_chalice: {
     id: 'iron_chalice', name: '铁杯', icon: '杯',
-    desc: '篝火额外回复 8 点生命。',
+    desc: '篝火额外提高 3 点生命上限。',
   },
   war_banner: {
     id: 'war_banner', name: '战旗', icon: '旗',

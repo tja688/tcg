@@ -27,11 +27,15 @@ export function handTransforms(n, hoverIndex = -1) {
   return out;
 }
 
-// 悬停手牌：抬高并略朝相机，保证叠在邻牌之前
-export function handHoverTransform(base) {
+// 悬停手牌：抬高、略立起朝向镜头，靠边的牌往画面内侧收，避免描述被裁切
+export function handHoverTransform(base, index = 0, n = 1) {
+  const mid = (n - 1) / 2;
+  const edge = n <= 1 ? 0 : (index - mid) / Math.max(mid, 1);
+  const pull = -edge * (0.42 + Math.abs(edge) * 0.55);
+  const x = THREE.MathUtils.clamp(base.pos.x + pull, -F.hoverXClamp, F.hoverXClamp);
   return {
-    pos: new THREE.Vector3(base.pos.x, base.pos.y + F.hoverLiftY, base.pos.z + F.hoverLiftZ),
-    rot: new THREE.Euler(F.hoverTilt, 0, 0),
+    pos: new THREE.Vector3(x, base.pos.y + F.hoverLiftY, base.pos.z + F.hoverLiftZ),
+    rot: new THREE.Euler(F.hoverTiltX, 0, 0),
     scale: F.hoverScale,
   };
 }

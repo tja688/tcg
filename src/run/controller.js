@@ -1,9 +1,9 @@
 import { createRun, grantRelic, snapshotRun } from './state.js';
 import { enterNode, completeCurrent, getNode, nodeReachable } from './map.js';
-import { getEvent, restHealAmount } from './events.js';
+import { addMaxHp, getEvent, restMaxHpAmount } from './events.js';
 import { getEncounter } from './encounters.js';
-import { generateShop, canAfford } from './shop.js';
-import { makeCombatReward, makeTreasureReward, applyGold, addCardToDeck, removeCardFromDeck } from './rewards.js';
+import { generateShop, buyShopCard, buyShopRelic, shopRemoveCard, refreshShopCards } from './shop.js';
+import { makeCombatReward, makeTreasureReward, applyGold, addCardToDeck } from './rewards.js';
 import { randomRelic, getRelic } from './relics.js';
 import { Game } from '../game/game.js';
 import { Screens, TYPE_META } from '../ui/screens.js';
@@ -111,11 +111,12 @@ export class RunController {
 
   async startCombat(encounterId, kind) {
     const encounter = getEncounter(encounterId);
+    this.run.hp = this.run.maxHp;
     this.hud.setMode('combat');
     this.hud.refreshRun(this.run);
     this.director.teardownCombat();
     const game = new Game(this.director, this.rng, {
-      playerHp: this.run.hp,
+      playerHp: this.run.maxHp,
       playerMaxHp: this.run.maxHp,
       playerDeckIds: this.run.deck.slice(),
       relics: this.run.relics.slice(),
@@ -134,7 +135,9 @@ export class RunController {
 
   async afterCombat(winner, kind) {
     this.input.enabled = false;
-    if (this.game) this.run.hp = this.game.player.hero.hp;
+    if (this.game) {
+      this.run.hp = winner === 'player' ? this.run.maxHp : this.game.player.hero.hp;
+    }
     this.hud.refreshRun(this.run);
     if (winner !== 'player') {
       this.run.alive = false;
@@ -209,40 +212,10 @@ export class RunController {
     let shop = generateShop(this.run, this.rng);
     this.run.shop = shop;
     await this.screens.showShop(this.run, shop, {
-      buyCard: (item) => {
-        if (item.sold) return { ok: false, reason: '已经卖出' };
-        if (!canAfford(this.run, item.price)) return { ok: false, reason: '金币不足' };
-        this.run.gold -= item.price;
-        addCardToDeck(this.run, item.cardId);
-        item.sold = true;
-        return { ok: true };
-      },
-      buyRelic: () => {
-        if (!shop.relic || shop.relic.sold) return { ok: false, reason: '没有可买的遗物' };
-        if (!canAfford(this.run, shop.relic.price)) return { ok: false, reason: '金币不足' };
-        this.run.gold -= shop.relic.price;
-        grantRelic(this.run, shop.relic.relicId);
-        shop.relic.sold = true;
-        return { ok: true };
-      },
-      removeCard: (cardId) => {
-        if (shop.removed) return { ok: false, reason: '已经删除过一张' };
-        if (!cardId) return { ok: false, reason: '' };
-        if (!canAfford(this.run, shop.removePrice)) return { ok: false, reason: '金币不足' };
-        if (!removeCardFromDeck(this.run, cardId)) return { ok: false, reason: '牌库里没有这张牌' };
-        this.run.gold -= shop.removePrice;
-        shop.removed = true;
-        return { ok: true };
-      },
-      refresh: () => {
-        if (shop.refreshed) return { ok: false, reason: '只能刷新一次' };
-        if (!canAfford(this.run, shop.refreshPrice)) return { ok: false, reason: '金币不足' };
-        this.run.gold -= shop.refreshPrice;
-        const next = generateShop(this.run, this.rng);
-        shop.cards = next.cards;
-        shop.refreshed = true;
-        return { ok: true, shop };
-      },
+      buyCard: (item) => buyShopCard(this.run, item),
+      buyRelic: () => buyShopRelic(this.run, shop),
+      removeCard: (cardId) => shopRemoveCard(this.run, shop, cardId),
+      refresh: () => refreshShopCards(this.run, shop, this.rng),
     });
     completeCurrent(this.run);
     await this.showMap();
@@ -250,9 +223,9 @@ export class RunController {
 
   async openRest() {
     this.hud.setMode('rest');
-    const heal = restHealAmount(this.run);
-    await this.screens.showRest(this.run, heal, () => {
-      this.run.hp = Math.min(this.run.maxHp, this.run.hp + heal);
+    const gain = restMaxHpAmount(this.run);
+    await this.screens.showRest(this.run, gain, () => {
+      addMaxHp(this.run, gain);
     });
     completeCurrent(this.run);
     await this.showMap();
@@ -281,8 +254,10 @@ export class RunController {
   }
 
   abandon() {
-    if (this.run) this.finishRun(false);
-    else this.beginRun();
+    if (this._ending) return;
+    this._ending = true;
+    const next = this.run ? this.finishRun(false) : this.beginRun();
+    return Promise.resolve(next).finally(() => { this._ending = false; });
   }
 
   async debugJump(type) {

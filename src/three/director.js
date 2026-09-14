@@ -122,6 +122,7 @@ export class Director {
     this.hoverBoardInst = null;
     this.dragInst = null;
     this._busy = 0;
+    this._combatEnded = false;
     this.onCombatEnd = null;
 
     this.dropZone = new DropZone(this.scene);
@@ -145,6 +146,7 @@ export class Director {
   }
 
   bindGame(game) {
+    this._combatEnded = false;
     this.game = game;
     const enc = game.encounter;
     this.heroVis = {
@@ -154,6 +156,23 @@ export class Director {
     this.scene.add(this.heroVis.player.group, this.heroVis.enemy.group);
     this.heroVis.player.updateMana(0, 0);
     this.heroVis.enemy.updateMana(0, 0);
+    this.syncEnemyHud();
+  }
+
+  syncEnemyHud(intent) {
+    const hero = this.game?.enemy?.hero;
+    if (!hero) {
+      this.hud?.setEnemyStatus?.({ name: '', intent: null });
+      return;
+    }
+    const payload = {
+      name: hero.name,
+      hp: hero.hp,
+      maxHp: hero.maxHp,
+      armor: hero.armor || 0,
+    };
+    if (intent !== undefined) payload.intent = intent;
+    this.hud?.setEnemyStatus?.(payload);
   }
 
   // ---------------- busy / 玩家操作入口 ----------------
@@ -176,7 +195,9 @@ export class Director {
     this.hoverBoardInst = null;
     this.dragInst = null;
     this.dropZone.hide();
+    this.world.setPlayLane?.(false);
     this.intentBadge.hide();
+    this.hud?.setEnemyStatus?.({ name: '', intent: null });
     this.hud?.showLlmThink?.('');
     this.hud?.hideEnemyBanter?.();
     this.world.screenFx?.reset();
@@ -187,6 +208,7 @@ export class Director {
     }
     this.game = null;
     this._busy = 0;
+    this._combatEnded = false;
     this.onCombatEnd = null;
   }
 
@@ -218,7 +240,7 @@ export class Director {
       const v = this.vis.get(inst.uid);
       if (!v) return;
       const hovered = inst === this.hoverInst;
-      const t = hovered ? handHoverTransform(ts[i]) : ts[i];
+      const t = hovered ? handHoverTransform(ts[i], i, visible.length) : ts[i];
       v.setLayered(hovered);
       v.setRenderOrder(hovered ? 90 : 10 + i);
       const dur = hovered ? feel.handHoverDur : feel.handRestDur;
@@ -372,6 +394,7 @@ export class Director {
     this.hud.setTurnPill(g.turnNo, g.turn, g.over);
     this.updatePiles('player');
     this.updateStrength();
+    this.syncEnemyHud();
   }
 
   updateDeck(side) {
@@ -394,7 +417,10 @@ export class Director {
     const s = this.game.sideOf(side);
     this.heroVis[side].updateMana(s.mana, s.manaMax);
   }
-  updateHp(hero) { this.heroVis[hero.side].updateHp(); }
+  updateHp(hero) {
+    this.heroVis[hero.side].updateHp();
+    if (hero.side === 'enemy') this.syncEnemyHud();
+  }
   updateStats(inst) { this.vis.get(inst.uid)?.updateStats(); }
 
   async drawCard(side, inst) {
@@ -667,15 +693,15 @@ export class Director {
     this.layoutBoard(side);
   }
 
-  async showIntent(intent) { this.intentBadge.show(intent); this.hud.setIntent?.(intent); }
-  async intentResolve(intent) { this.intentBadge.pulse(); this.hud.toast(intent?.label || '预兆应验'); }
+  async showIntent(intent) { this.syncEnemyHud(intent); }
+  async intentResolve(intent) { this.hud.toast(intent?.label || '预兆应验'); }
   async phaseChange(banner, intent) {
     this.hud.banner(banner, 'enemy');
     this.sfx.rumble();
     this.world.screenFx?.punch({
       letterbox: 0.055, shake: 0.24, vignette: 0.16, tint: 0xff5040, tintAmt: 0.14, bloom: 0.12,
     });
-    if (intent) this.intentBadge.show(intent);
+    if (intent) this.syncEnemyHud(intent);
     await sleep(900);
   }
   async buffEffect(target) {
@@ -711,6 +737,8 @@ export class Director {
   }
 
   async gameOver(winner) {
+    if (this._combatEnded) return;
+    this._combatEnded = true;
     this.refreshIndicators();
     this.clearAllHighlightsSafe();
     this.intentBadge.hide();

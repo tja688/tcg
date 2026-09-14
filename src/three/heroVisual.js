@@ -68,7 +68,7 @@ export class HeroVisual {
     }));
     this.hpSprite.scale.set(1.05, 1.05, 1);
     if (side === 'player') this.hpSprite.position.set(-1.55, 0.3, 0.25);
-    else this.hpSprite.position.set(1.42, -0.42, 0.3);
+    else this.hpSprite.position.set(1.58, 1.22, 0.28);
     this.group.add(this.hpSprite);
     this.paintHp();
 
@@ -109,8 +109,9 @@ export class HeroVisual {
       text: hero.name, font: '600 44px "Microsoft YaHei"', color: side === 'player' ? '#e8d9ae' : '#f0a89a',
       canvasW: 512, canvasH: 96, worldH: 0.3, strokeWidth: 6,
     });
-    this.nameText.sprite.position.set(0, side === 'player' ? -1.5 : 1.62, side === 'player' ? 0.5 : 0.2);
-    this.nameText.material.opacity = 0.9;
+    this.nameText.sprite.position.set(0, side === 'player' ? -1.5 : 2.42, side === 'player' ? 0.5 : 0.15);
+    this.nameText.material.opacity = side === 'player' ? 0.9 : 0;
+    this.nameText.sprite.visible = side === 'player';
     this.group.add(this.nameText.sprite);
   }
 

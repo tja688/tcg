@@ -1,11 +1,11 @@
 import { shuffle } from '../utils/rng.js';
 
-// ============ 卡牌图鉴 ============
+// 卡牌图鉴。加新卡：写 CARDS，登记 art，再放进配方或遭遇牌库。
 // type: minion | spell
-// keywords: taunt(嘲讽) charge(冲锋)
-// battlecry: { type: 'draw' | 'aoe_enemy', n / amount }
-// spell: { kind: 'damage'|'heal'|'draw'|'aoe_enemy', amount/n, target, vfx }
-//   target: 'enemy-any'(敌方角色) | 'friendly-any'(友方角色) | 'none'
+// keywords: taunt | charge
+// battlecry: draw | aoe_enemy | damage_enemy_hero
+// spell.kind: damage | aoe_enemy | heal | draw | buff | debuff | armor
+// spell.target: enemy-any | friendly-any | friendly-minion | enemy-minion | none
 export const CARDS = {
   flame_imp: {
     id: 'flame_imp', name: '烈焰小鬼', type: 'minion', cost: 1, attack: 2, health: 1,

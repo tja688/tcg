@@ -194,7 +194,7 @@ export class InputController {
       this._proj.copy(ts[i].pos).project(cam);
       const rec = { inst, nx: this._proj.x, ny: this._proj.y, hnx: this._proj.x, hny: this._proj.y };
       if (inst === hover) {
-        const lifted = handHoverTransform(ts[i]);
+        const lifted = handHoverTransform(ts[i], i, visible.length);
         this._proj.copy(lifted.pos).project(cam);
         rec.hnx = this._proj.x;
         rec.hny = this._proj.y;
@@ -451,6 +451,7 @@ export class InputController {
 
     if (def.type === 'minion') {
       this.mode = 'dragMinion';
+      this.world.setPlayLane?.(true);
       gsap.to(v.group.rotation, { x: -1.05, y: 0, z: 0, duration: 0.18, overwrite: 'auto' });
       gsap.to(v.group.scale, { x: 1.02, y: 1.02, z: 1, duration: 0.18, overwrite: 'auto' });
       this.setCursor('grabbing');
@@ -468,6 +469,7 @@ export class InputController {
       this.hud.setAimHint?.('点击或指向发光目标');
     } else {
       this.mode = 'dragSpellFree';
+      this.world.setPlayLane?.(true);
       gsap.to(v.group.rotation, { x: -0.9, y: 0, z: 0, duration: 0.18, overwrite: 'auto' });
       this.setCursor('grabbing');
       this.hud.setAimHint?.('拖向战场中央施放');
@@ -571,6 +573,7 @@ export class InputController {
     this.arrow.hide();
     this.setCursor('default');
     this.hideDropHint();
+    this.world.setPlayLane?.(false);
     this.hud.setAimHint?.('');
   }
 
@@ -603,7 +606,10 @@ export class InputController {
       return;
     }
     const sp = this.activeInst.def?.spell;
-    if (sp?.kind === 'damage') this.hud.setAimHint?.(`造成 ${sp.amount} 点伤害`);
+    if (sp?.kind === 'damage') {
+      const amt = this.game.spellDamage(sp.amount);
+      this.hud.setAimHint?.(`造成 ${amt} 点伤害`);
+    }
     else if (sp?.kind === 'heal') this.hud.setAimHint?.(`恢复 ${sp.amount} 点生命`);
     else if (sp?.kind === 'buff') this.hud.setAimHint?.(`+${sp.amount} 攻击`);
     else if (sp?.kind === 'debuff') this.hud.setAimHint?.(`-${sp.amount} 攻击`);
@@ -618,7 +624,10 @@ export class InputController {
   }
 
   update(t) {
-    if (!this.mode) this.hideDropHint();
+    if (!this.mode) {
+      this.hideDropHint();
+      this.world.setPlayLane?.(false);
+    }
     this.arrow.pulse(t);
   }
 }

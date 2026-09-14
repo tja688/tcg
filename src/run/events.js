@@ -1,13 +1,18 @@
 import { CFG } from '../config.js';
 import { CARDS, collectibleCards, randomCollectible } from '../game/cards.js';
 import { getRelic, randomRelic } from './relics.js';
+import { applyGold } from './rewards.js';
 
 function clampHp(run) {
   run.hp = Math.max(0, Math.min(run.maxHp, run.hp));
 }
 
-function gainGold(run, n) {
-  run.gold = Math.max(0, run.gold + n);
+export function addMaxHp(run, n) {
+  const gain = Math.max(0, Math.round(n));
+  if (!gain) return 0;
+  run.maxHp += gain;
+  run.hp += gain;
+  return gain;
 }
 
 export const EVENTS = {
@@ -23,7 +28,7 @@ export const EVENTS = {
         hint: '50%：+45 金 / 失去 8 生命',
         apply(run, ctx) {
           if (ctx.rng() < 0.5) {
-            gainGold(run, 45);
+            applyGold(run, 45);
             return { text: '钱币落地，金光炸开。你捡起 45 金币。', gold: 45 };
           }
           run.hp -= 8; clampHp(run);
@@ -35,7 +40,7 @@ export const EVENTS = {
         label: '只取苍银',
         hint: '+15 金',
         apply(run) {
-          gainGold(run, 15);
+          applyGold(run, 15);
           return { text: '你没有贪婪。衣袋里多了 15 金币。', gold: 15 };
         },
       },
@@ -57,13 +62,13 @@ export const EVENTS = {
       {
         id: 'heal',
         label: '付 25 金沐浴',
-        hint: '-25 金，回复 16 生命',
+        hint: '-25 金，生命上限 +6',
         disabled: (run) => run.gold < 25,
         disabledHint: '金币不足 25',
         apply(run) {
           run.gold -= 25;
-          run.hp = Math.min(run.maxHp, run.hp + 16);
-          return { text: '温水没过肩线。回复 16 点生命。', gold: -25, hp: 16 };
+          addMaxHp(run, 6);
+          return { text: '温水没过肩线。生命上限提高 6 点。', gold: -25, maxHp: 6 };
         },
       },
       {
@@ -72,7 +77,7 @@ export const EVENTS = {
         hint: '-10 生命，+40 金',
         apply(run) {
           run.hp -= 10; clampHp(run);
-          gainGold(run, 40);
+          applyGold(run, 40);
           return { text: '泉水变红。你获得 40 金币。', hp: -10, gold: 40 };
         },
       },
@@ -143,10 +148,10 @@ export const EVENTS = {
       {
         id: 'pray',
         label: '只做祈祷',
-        hint: '回复 6 生命',
+        hint: '生命上限 +3',
         apply(run) {
-          run.hp = Math.min(run.maxHp, run.hp + 6);
-          return { text: '旧神没有回答，但伤口浅了一些。', hp: 6 };
+          addMaxHp(run, 3);
+          return { text: '旧神没有回答，经脉却宽了一寸。', maxHp: 3 };
         },
       },
     ],
@@ -196,11 +201,11 @@ export const EVENTS = {
       {
         id: 'bow',
         label: '鞠躬致意',
-        hint: '+18 金，回复 4 生命',
+        hint: '+18 金，生命上限 +2',
         apply(run) {
-          gainGold(run, 18);
-          run.hp = Math.min(run.maxHp, run.hp + 4);
-          return { text: '神龛里滚出几枚旧币，掌心也暖了。', gold: 18, hp: 4 };
+          applyGold(run, 18);
+          addMaxHp(run, 2);
+          return { text: '神龛里滚出几枚旧币，体魄也沉了一分。', gold: 18, maxHp: 2 };
         },
       },
       {
@@ -258,10 +263,10 @@ export const EVENTS = {
       {
         id: 'leave',
         label: '井边站一会儿就走',
-        hint: '回复 3 生命',
+        hint: '生命上限 +2',
         apply(run) {
-          run.hp = Math.min(run.maxHp, run.hp + 3);
-          return { text: '阴凉很好。你继续赶路。', hp: 3 };
+          addMaxHp(run, 2);
+          return { text: '阴凉很好。你觉得肩背更沉稳了。', maxHp: 2 };
         },
       },
     ],
@@ -280,7 +285,7 @@ export const EVENTS = {
         apply(run, ctx) {
           const n = 1 + Math.floor(ctx.rng() * 6);
           if (n >= 3) {
-            gainGold(run, 30);
+            applyGold(run, 30);
             return { text: `骰面是 ${n}。你赢走 30 金币。`, gold: 30 };
           }
           run.hp -= 9; clampHp(run);
@@ -332,10 +337,10 @@ export const EVENTS = {
       {
         id: 'water',
         label: '只要免费的水',
-        hint: '回复 5 生命',
+        hint: '生命上限 +3',
         apply(run) {
-          run.hp = Math.min(run.maxHp, run.hp + 5);
-          return { text: '水有铁锈味，但能喝。', hp: 5 };
+          addMaxHp(run, 3);
+          return { text: '水有铁锈味，却把经脉冲宽了些。', maxHp: 3 };
         },
       },
     ],
@@ -364,7 +369,7 @@ export const EVENTS = {
         label: '撕毁契约',
         hint: '获得 22 金，加入一张「负担」',
         apply(run) {
-          gainGold(run, 22);
+          applyGold(run, 22);
           run.deck.push('burden');
           return { text: '纸屑变成金币，也变成一张沉重的「负担」。', gold: 22, addCard: 'burden' };
         },
@@ -383,9 +388,8 @@ export function optionDisabled(run, opt) {
   return !!(opt.disabled && opt.disabled(run));
 }
 
-export function restHealAmount(run) {
-  const fromRatio = Math.ceil(run.maxHp * CFG.rules.restHealRatio);
-  let n = Math.max(CFG.rules.restHealMin, fromRatio);
-  if ((run.relics || []).includes('iron_chalice')) n += 8;
+export function restMaxHpAmount(run) {
+  let n = CFG.rules.restMaxHp;
+  if ((run.relics || []).includes('iron_chalice')) n += CFG.rules.restMaxHpChalice;
   return n;
 }

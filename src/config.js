@@ -3,14 +3,14 @@ export const CFG = {
   card: { w: 1.9, h: 2.66, texW: 512, texH: 716, radius: 34 },
 
   layout: {
-    handY: 3.18, handZ: 6.3,
+    handY: 3.42, handZ: 6.18,
     enemyHandY: 2.35, enemyHandZ: -7.55,
-    rowZ: { player: 1.95, enemy: -2.35 },
+    rowZ: { player: 1.95, enemy: -1.72 },
     minionY: 1.3,          // 站立卡牌中心高度
     minionTilt: -0.3,      // 站立卡牌向后仰角
     boardSpacing: 2.22,
-    heroPos: { player: [-5.5, 1.12, 4.7], enemy: [0, 1.12, -5.62] },
-    manaAnchor: { player: [3.35, 0.26, 5.8], enemy: [-2.3, 0.26, -4.9] },
+    heroPos: { player: [-5.5, 1.12, 4.7], enemy: [0, 1.72, -6.28] },
+    manaAnchor: { player: [3.35, 0.26, 5.8], enemy: [-2.55, 0.26, -5.55] },
     deckPos: { player: [7.35, 0.06, 4.35], enemy: [-7.35, 0.06, -4.35] },
     endTurnPos: [7.5, 0.16, -0.2],
     revealPos: { player: [0, 3.3, 2.6], enemy: [0, 3.15, -0.2] },
@@ -22,24 +22,26 @@ export const CFG = {
 
   // 操作手感：手牌弹出 / 邻牌让位 / 拖拽阈值
   feel: {
-    hoverLiftY: 1.38,
-    hoverLiftZ: 0.36,
-    hoverScale: 1.26,
-    hoverTilt: -0.2,
+    hoverLiftY: 1.08,
+    hoverLiftZ: -0.22,
+    hoverScale: 1.18,
+    hoverTilt: 0,
+    hoverTiltX: -0.38,
+    hoverXClamp: 2.35,
     handPart: 0.5,
     handHoverDur: 0.18,
     handRestDur: 0.24,
     dragThreshold: 10,
     hoverSliverSlack: 0.02,
-    hoverCardHalfX: 0.09,
-    hoverCardHalfY: 0.26,
+    hoverCardHalfX: 0.16,
+    hoverCardHalfY: 0.34,
   },
 
   rules: {
     maxBoard: 6, maxHand: 10, maxMana: 10,
     heroHp: 40, startHandPlayer: 4, startHandEnemy: 4,
     startGold: 80,
-    restHealRatio: 0.3, restHealMin: 12,
+    restMaxHp: 5, restMaxHpChalice: 3,
     shopRemove: 75, shopRefresh: 25,
     combatGold: [14, 20], eliteGold: [26, 36],
   },

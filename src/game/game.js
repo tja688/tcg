@@ -1,6 +1,6 @@
 import { CFG } from '../config.js';
 import { buildDeck, buildDeckFromIds, hasKeyword, CARDS } from './cards.js';
-import { runAI } from './ai.js';
+import { runAI } from '../pseudoai/brain.js';
 import { computeIntent } from './intent.js';
 import { hasRelic } from '../run/relics.js';
 import { getEncounter } from '../run/encounters.js';
@@ -50,7 +50,6 @@ export class Game {
     this.fatigue = { player: 0, enemy: 0 };
     this.phase = 1;
     this.lockedIntent = null;
-    this._phaseAnnounced = 1;
   }
 
   sideOf(name) { return name === 'player' ? this.player : this.enemy; }
@@ -107,7 +106,7 @@ export class Game {
       const n = this.fatigue[sideName];
       await this.fx.drawFail(sideName);
       this.applyDamage(s.hero, n);
-      if (this.checkWin()) { await this.fx.gameOver(this.winner); }
+      await this.announceWin();
       return;
     }
     const def = s.deck.pop();
@@ -238,9 +237,7 @@ export class Game {
       await this.resolveSpell(inst, def.spell, target);
     }
 
-    await this.checkDeaths();
-    await this.checkPhaseChange();
-    if (this.checkWin()) { await this.fx.gameOver(this.winner); return true; }
+    if (await this.settle()) return true;
     this.fx.refreshIndicators();
     if (inst.side === 'player' && (def.cost >= 4 || def.rarity === 'legendary')) {
       notifyPseudoAI(this, { type: 'player_play', card: def.name });
@@ -332,9 +329,7 @@ export class Game {
     }
     await this.fx.attackRecover(attacker);
 
-    await this.checkDeaths();
-    await this.checkPhaseChange();
-    if (this.checkWin()) { await this.fx.gameOver(this.winner); return true; }
+    if (await this.settle()) return true;
     this.fx.refreshIndicators();
     if (attacker.side === 'player' && (target.kind === 'hero' || (target.kind === 'minion' && target.health <= 0))) {
       notifyPseudoAI(this, {
@@ -448,9 +443,7 @@ export class Game {
         }
         break;
     }
-    await this.checkDeaths();
-    await this.checkPhaseChange();
-    if (this.checkWin()) { await this.fx.gameOver(this.winner); }
+    if (await this.settle()) return;
     this.fx.refreshIndicators();
   }
 
@@ -482,6 +475,18 @@ export class Game {
     this.fx.updatePiles?.('player');
     this.fx.updatePiles?.('enemy');
     await this.fx.deaths(dead);
+  }
+
+  async announceWin() {
+    const wasOver = this.over;
+    if (this.checkWin() && !wasOver) await this.fx.gameOver(this.winner);
+    return this.over;
+  }
+
+  async settle() {
+    await this.checkDeaths();
+    await this.checkPhaseChange();
+    return this.announceWin();
   }
 
   checkWin() {

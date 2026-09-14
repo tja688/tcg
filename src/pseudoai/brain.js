@@ -27,7 +27,11 @@ export async function runAI(game) {
     if (!playable.length) return FAILURE;
     const pick = choosePlay(game, playable);
     if (!pick) return FAILURE;
-    await fakeThink(hud, 'play', first);
+    await fakeThink(hud, 'play', first, {
+      game,
+      session,
+      intent: makePlayIntent(pick),
+    });
     first = false;
     if (game.over) return FAILURE;
     const ok = await game.playCard(pick.inst, { slot: pick.slot, target: pick.target });
@@ -49,7 +53,11 @@ export async function runAI(game) {
     const targets = game.validAttackTargets(attacker);
     if (!targets.length) { attacker.canAttack = false; return SUCCESS; }
     const target = chooseAttackTarget(game, attacker, targets);
-    await fakeThink(hud, 'attack', first);
+    await fakeThink(hud, 'attack', first, {
+      game,
+      session,
+      intent: makeAttackIntent(attacker, target),
+    });
     first = false;
     if (game.over) return FAILURE;
     const ok = await game.attack(attacker, target);
@@ -65,6 +73,38 @@ export async function runAI(game) {
   });
 
   if (!game.over) await game.endTurn('enemy');
+}
+
+function makePlayIntent(pick) {
+  const d = pick.inst?.def;
+  const t = pick.target;
+  const amount = d?.spell?.amount || 0;
+  return {
+    type: 'play',
+    card: d?.name || '',
+    cost: d?.cost,
+    cardType: d?.type || '',
+    spellKind: d?.spell?.kind || d?.battlecry?.type || '',
+    targetName: describeTarget(t),
+    targetTaunt: !!(t && t.taunt),
+    lethal: !!(t && t.kind === 'hero' && (t.hp + (t.armor || 0)) <= amount),
+    kill: !!(t && t.kind === 'minion' && t.health <= amount),
+    aoe: d?.spell?.kind === 'aoe_enemy' || d?.battlecry?.type === 'aoe_enemy',
+  };
+}
+
+function makeAttackIntent(attacker, target) {
+  const dmg = attacker.attack || 0;
+  return {
+    type: 'attack',
+    card: attacker.def?.name || '',
+    attackerName: attacker.def?.name || '',
+    cardType: 'attack',
+    targetName: describeTarget(target),
+    targetTaunt: !!target?.taunt,
+    lethal: !!(target?.kind === 'hero' && (target.hp + (target.armor || 0)) <= dmg),
+    kill: !!(target?.kind === 'minion' && target.health <= dmg),
+  };
 }
 
 function arch(game) {

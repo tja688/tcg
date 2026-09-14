@@ -11,6 +11,8 @@ let _ok = null;
 let _chatUrl = null;
 let _inflight = 0;
 
+export const THINK_MUTTER = { maxTokens: 48, timeoutMs: 4000 };
+
 export function llmStatus() {
   return { ok: _ok, inflight: _inflight, url: _chatUrl };
 }
@@ -55,7 +57,7 @@ export function sanitizeLine(raw, maxLen = 28) {
   s = s.split('\n').map((l) => l.trim()).find(Boolean) || '';
   s = s.replace(SPEAKER_RE, '').replace(STRIP_QUOTES, '').trim();
   s = s.replace(/[\s。！？!?]{2,}/g, (m) => m[0]);
-  if (/建议|应该出|推荐|最优|策略|分析|作为AI|语言模型|Thinking Process/.test(s)) return '';
+  if (/建议|应该出|推荐|最优|策略|分析|作为AI|作为人工智能|语言模型|Thinking Process/.test(s)) return '';
   if (s.length > maxLen) s = s.slice(0, maxLen).replace(/[，,、；;：:\s]+$/, '');
   return s;
 }

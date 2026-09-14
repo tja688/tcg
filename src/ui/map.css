@@ -1,0 +1,311 @@
+/* 远征地图：绘制底图、印记节点、墨迹路径、棋子。覆盖 index.html / screens.css 的旧圆钮样式。 */
+
+.panel.dim.mapPanel {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 70px 22px 18px;
+}
+
+.mapPanel .mapChrome {
+  width: min(1180px, 96vw);
+}
+
+.mapPanel .mapStage {
+  isolation: isolate;
+  flex: 1;
+  width: 100%;
+  min-height: 440px;
+  height: min(70vh, 620px);
+  margin-top: 6px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0a0614;
+  border: 1px solid rgba(212, 176, 106, 0.52);
+  box-shadow:
+    inset 0 0 0 1px rgba(62, 42, 14, 0.35),
+    inset 0 0 90px 18px rgba(0, 0, 0, 0.5),
+    0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.mapPanel .mapStageBg {
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(4, 2, 10, 0.58) 100%),
+    linear-gradient(180deg, rgba(10, 6, 18, 0.28), rgba(6, 4, 12, 0.4)),
+    url('/assets/ui/map_act1.png') center / cover no-repeat;
+}
+
+.mapPanel .mapLines {
+  z-index: 1;
+}
+
+.mapPanel .mapNodes {
+  z-index: 2;
+}
+
+.mapPanel .mapPath {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: none;
+  animation: none;
+}
+
+.mapPanel .mapPath.ink {
+  filter: url(#mapInk);
+}
+
+.mapPanel .mapPath.ink.idle {
+  stroke: rgba(42, 28, 14, 0.28);
+  stroke-width: 4.6;
+}
+
+.mapPanel .mapPath.dust.idle {
+  stroke: rgba(176, 138, 72, 0.14);
+  stroke-width: 1.35;
+}
+
+.mapPanel .mapPath.ink.walked {
+  stroke: rgba(36, 22, 10, 0.72);
+  stroke-width: 6.2;
+}
+
+.mapPanel .mapPath.dust.walked {
+  stroke: rgba(196, 150, 78, 0.78);
+  stroke-width: 2.1;
+  filter: url(#mapGoldDust);
+}
+
+.mapPanel .mapPath.ink.next {
+  stroke: rgba(72, 48, 16, 0.55);
+  stroke-width: 6.4;
+}
+
+.mapPanel .mapPath.dust.next {
+  stroke: #e6c16a;
+  stroke-width: 2.4;
+  filter: url(#mapGoldDust);
+}
+
+.mapPanel .mapPin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.mapPanel .mapNode {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 92px;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #fff6dd;
+  cursor: pointer;
+  opacity: 1;
+  filter: none;
+  font-family: inherit;
+}
+
+.mapPanel .mapNode.t-boss,
+.mapPanel .mapNode.t-boss.current,
+.mapPanel .mapNode.t-boss.available {
+  width: 112px;
+  height: auto;
+}
+
+.mapPanel .mapNode .nodeCore {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  border: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(18, 12, 32, 0.2) 40%, rgba(6, 4, 14, 0.55) 100%);
+  box-shadow:
+    0 0 0 2px rgba(232, 196, 118, 0.72),
+    0 0 0 4px rgba(20, 10, 6, 0.55),
+    0 10px 22px rgba(0, 0, 0, 0.65),
+    0 0 16px rgba(230, 193, 106, 0.18);
+  display: grid;
+  place-items: center;
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+.mapPanel .mapNode.t-boss .nodeCore {
+  width: 94px;
+  height: 94px;
+  box-shadow:
+    0 0 0 2px rgba(255, 96, 72, 0.85),
+    0 0 0 5px rgba(20, 6, 6, 0.55),
+    0 12px 26px rgba(0, 0, 0, 0.7),
+    0 0 22px rgba(180, 40, 24, 0.38);
+}
+
+.mapPanel .mapNode .ico {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mapPanel .mapNode .ico img,
+.mapPanel .mapNode .ico svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: saturate(1.15) brightness(1.12) contrast(1.08);
+}
+
+.mapPanel .mapPin .mapNode .lab {
+  position: static;
+  bottom: auto;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: #efe3c0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+
+.mapPanel .mapNode.t-elite .nodeCore,
+.mapPanel .mapNode.t-shop .nodeCore,
+.mapPanel .mapNode.t-rest .nodeCore,
+.mapPanel .mapNode.t-event .nodeCore,
+.mapPanel .mapNode.t-treasure .nodeCore {
+  border: none;
+}
+
+.mapPanel .mapNode.available .nodeCore {
+  filter: none;
+  box-shadow:
+    0 0 0 2px #f2d089,
+    0 0 0 5px rgba(20, 12, 6, 0.5),
+    0 10px 22px rgba(0, 0, 0, 0.65),
+    0 0 22px rgba(242, 208, 137, 0.55);
+}
+
+.mapPanel .mapNode.current .nodeCore {
+  box-shadow:
+    0 0 0 2px #8cffb0,
+    0 0 0 5px rgba(8, 18, 12, 0.5),
+    0 10px 22px rgba(0, 0, 0, 0.65),
+    0 0 20px rgba(125, 255, 158, 0.42);
+}
+
+.mapPanel .mapNode.available:hover .nodeCore,
+.mapPanel .mapNode.available:focus-visible .nodeCore {
+  transform: scale(1.08);
+}
+
+.mapPanel .mapNode.visited {
+  opacity: 0.78;
+  filter: none;
+  cursor: not-allowed;
+}
+
+.mapPanel .mapNode.visited .nodeCore {
+  opacity: 0.88;
+  filter: saturate(0.78) brightness(0.88);
+}
+
+.mapPanel .mapNode.locked,
+.mapPanel .mapNode.skipped {
+  opacity: 0.48;
+  filter: none;
+  cursor: not-allowed;
+}
+
+.mapPanel .mapNode.locked .nodeCore,
+.mapPanel .mapNode.skipped .nodeCore {
+  opacity: 0.7;
+  filter: grayscale(0.25) brightness(0.72);
+}
+
+.mapPanel .mapNode .pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(230, 193, 106, 0.7);
+  box-shadow: 0 0 10px rgba(230, 193, 106, 0.25);
+  pointer-events: none;
+}
+
+.mapPanel .mapNode.t-boss .pulse {
+  inset: -7px;
+}
+
+.mapPanel .mapPawn {
+  position: absolute;
+  z-index: 6;
+  width: 64px;
+  height: 86px;
+  transform: translate(-50%, -88%);
+  pointer-events: none;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.7));
+}
+
+.mapPanel .mapPawnInner {
+  width: 100%;
+  height: 100%;
+}
+
+.mapPanel .mapPawn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  -webkit-mask-image: radial-gradient(ellipse 48% 46% at 50% 54%, #000 72%, transparent 86%);
+  mask-image: radial-gradient(ellipse 48% 46% at 50% 54%, #000 72%, transparent 86%);
+}
+
+.mapPanel .mapPawn.face-left .mapPawnInner {
+  transform: scaleX(-1);
+}
+
+.mapPanel .mapTip {
+  z-index: 8;
+}
+
+.mapPanel .mapLegend img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.mapPanel .mapLegend i {
+  display: none;
+}
+
+.mapPanel.is-marching .mapNode {
+  pointer-events: none;
+  cursor: wait;
+}
+
+@media (max-width: 900px) {
+  .mapPanel .mapStage { min-height: 320px; }
+  .mapPanel .mapNode { width: 76px; }
+  .mapPanel .mapNode .nodeCore { width: 62px; height: 62px; }
+  .mapPanel .mapNode.t-boss .nodeCore { width: 74px; height: 74px; }
+  .mapPanel .mapPawn { width: 52px; height: 70px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapPanel .mapNode .pulse {
+    animation: none;
+    opacity: 0.7;
+  }
+}

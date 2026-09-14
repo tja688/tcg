@@ -29,3 +29,6 @@ Desktop.ini
 
 # local Qwen3.5-2B runtime / weights
 .local/
+
+# local agent audit trail
+.audit/

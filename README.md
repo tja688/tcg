@@ -1,6 +1,6 @@
 # 奥术对决 · Arcane Duel
 
-一个用 **Three.js** 构建的 3D TCG 卡牌对战 Demo。重点在视觉表现：实体 3D 卡牌、自定义着色器、体积感光效、后期处理、程序化音效，规则层刻意保持精简
+一个用 Three.js 构建的 3D 卡牌远征。一局 14 层地图，节点上进入战斗、事件、商店、篝火或宝藏。战斗规则在 `Game`，画面在 `Director`，长线进度在 `RunController`。
 
 ## 快速开始
 
@@ -14,13 +14,14 @@ npm run build      # 产物输出到 dist/
 
 ## 玩法
 
-经典 TCG 极简规则集（类炉石）：
+战斗是精简 TCG 规则，叠在 14 层远征上。
 
-- 双方英雄 30 血，谁先归零谁输。
-- 每回合法力水晶 +1（上限 10），回合开始回满并抽一张牌。
-- 随从入场有召唤失调（当回合不能攻击），除非带**冲锋**；场上有**嘲讽**随从时必须先攻击它。
-- 随从互殴双方同时结算伤害；法术分指向性（火球/闪电/治疗）与无目标（AOE/抽牌）。
-- 牌库抽干后疲劳伤害递增；战场上限 6 个随从，手牌上限 10 张（超出焚毁）。
+- 远征开局 40 血、80 金、14 张起手牌库。打进 Boss 并获胜才算通关。
+- 战斗双方英雄谁先到 0 谁输。同时击倒时玩家胜。
+- 每回合法力 +1（上限 10），回合开始回满并抽一张。玩家先手。
+- 随从入场当回合不能攻击，除非带冲锋。场上有嘲讽时，随从攻击必须先打嘲讽。法术和敌方预兆打脸不受嘲讽限制。
+- 牌库抽空后疲劳伤害递增。战场最多 6 个随从，手牌最多 10 张，超出焚毁。
+- 敌方回合先结算预兆，再由 `pseudoai/brain.js` 出牌和攻击。本地 LLM 只负责台词，不选牌。
 
 ### 操作
 
@@ -37,7 +38,9 @@ npm run build      # 产物输出到 dist/
 
 ![指向瞄准](docs/screenshot-targeting.png)
 
-## 卡牌一览（13 种 / 30 张卡组）
+## 卡牌一览
+
+图鉴在 `src/game/cards.js`。起手牌库是 `src/run/state.js` 的 `STARTER_DECK`（14 张）。下面是早期对战 Demo 留下的核心牌，远征图鉴比这份更长。
 
 | 卡牌 | 费用 | 属性 | 效果 |
 | --- | --- | --- | --- |
@@ -59,36 +62,39 @@ npm run build      # 产物输出到 dist/
 
 ```
 src/
-├── config.js            # 全局配置：卡牌尺寸 / 布局坐标 / 规则数值 / 配色
-├── main.js              # 启动入口、主循环、调试接口 window.__tcg
-├── input.js             # 指针交互：悬停 / 拖拽 / 瞄准箭头 / 快捷键
+├── config.js            # 卡尺寸、布局、规则数值、配色
+├── main.js              # 启动、主循环、window.__tcg / __run
+├── input.js             # 战斗指针：拖拽、瞄准、空格结束回合
 ├── game/
-│   ├── cards.js         # ★ 卡牌图鉴 + 卡组配比（加新卡从这里开始）
-│   ├── game.js          # ★ 规则引擎（唯一状态权威，视觉全部经 fx 注入）
-│   └── ai.js            # 敌方 AI：贪心出牌 + 启发式选择攻击目标
-├── three/
-│   ├── sceneSetup.js    # 场景/相机/灯光/竞技场/背景/后期管线（Bloom + 调色）
-│   ├── cardMaterial.js  # 卡面 ShaderMaterial：溶解 / 受击闪白 / 传说箔面 / 去饱和
-│   ├── cardVisual.js    # 单张卡的 3D 实体：Canvas 绘制卡面、描边、状态环
-│   ├── heroVisual.js    # 英雄头像、血量宝珠、法力水晶
-│   ├── layout.js        # 手牌扇形 / 战场排布的变换计算
-│   ├── director.js      # ★ 视觉总调度：实现 fx 接口，编排所有动画时序
-│   ├── effects.js       # 战斗特效：飘字 / 弹道 / 闪电 / AOE / 治疗 / 死亡溶解
-│   └── particles.js     # 轻量粒子系统（爆发 / 余烬 / 火盆）
-├── ui/hud.js            # HTML 层：回合横幅 / Toast / 结算画面 / 加载页
-├── audio/sfx.js         # Web Audio 程序化音效（无音频文件）
-└── utils/               # 种子随机 / Canvas 贴图工具 / 资产加载
+│   ├── cards.js         # 图鉴。加新卡从这里开始
+│   ├── game.js          # 战斗规则。只改数据并 await this.fx
+│   ├── intent.js        # 敌方预兆
+│   └── snapshot.js      # 局面快照，给调试和对照脚本
+├── run/
+│   ├── controller.js    # 远征循环：地图 → 节点 → 战斗/事件/店
+│   ├── state.js         # createRun、起手牌库、grantRelic
+│   ├── map.js           # 14 层 Act 1
+│   ├── encounters.js    # 遭遇
+│   ├── events.js        # 事件
+│   ├── shop.js / rewards.js / relics.js
+├── pseudoai/
+│   ├── brain.js         # 敌方出牌和攻击（不读预兆，不用 LLM）
+│   └── banter.js        # 台词。LLM 挂了就走本地句子
+├── three/director.js    # fx 实现 + 玩家入口（canAct / busy）
+├── ui/                  # 标题、地图、商店、HUD
+├── audio/sfx.js
+└── utils/rng.js         # mulberry32。run 与战斗洗牌共用一条流
 ```
 
-核心解耦：`game.js` 只改数据并 `await this.fx.xxx()`，`director.js` 实现全部 `fx` 视觉方法。**改规则不用碰渲染，改表现不用碰规则。**
+改规则只动 `game/`。改远征只动 `run/`。改演出只动 `three/` 和 `ui/`。`npm test` 跑 `scripts/check-run-logic.mjs` 和 `scripts/check-combat-logic.mjs`。
 
 ## 二次开发指南
 
-- **加一张新卡**：在 `src/game/cards.js` 的 `CARDS` 里加定义，把原画放到 `public/assets/art_<id>.png` 并在 `src/utils/assets.js` 的 `IMAGE_LIST` 登记，最后加进 `DECK_RECIPE`。现成可组合的能力：`taunt` / `charge` / 战吼（抽牌、AOE）/ 法术（伤害、治疗、抽牌、AOE）。
-- **加新机制**：在 `game.js` 对应流程（`playCard` / `resolveAttack` / `startTurn`）加规则分支，再到 `director.js` / `effects.js` 补一个视觉方法即可。
-- **调数值**：血量、法力上限、起手牌数等都在 `src/config.js` 的 `rules`。
-- **调画面**：布局坐标（手牌高度、英雄位、出牌判定区）在 `config.js` 的 `layout`；镜头与后期（Bloom 强度、暗角、调色）在 `sceneSetup.js`。
-- **换美术**：直接替换 `public/assets/` 下同名 PNG 即可，卡面文字与边框是运行时 Canvas 绘制的。
+- **加一张新卡**：在 `src/game/cards.js` 的 `CARDS` 里加定义，原画放到 `public/assets/` 并在 `src/utils/assets.js` 的 `IMAGE_LIST` 登记，再放进遭遇牌库、商店池或 `STARTER_DECK`。现成关键字：`taunt` / `charge`。战吼：抽牌、AOE、打脸。法术：伤害、治疗、抽牌、AOE、加减攻、护甲。
+- **加新机制**：在 `game.js` 的 `playCard` / `attack` / `startTurn` 加规则，再到 `director.js` 补一个 `fx` 方法。
+- **调数值**：`src/config.js` 的 `rules`。远征金币和篝火也在这里。
+- **调画面**：`config.js` 的 `layout`；镜头与后期在 `sceneSetup.js`。
+- **换美术**：替换 `public/assets/` 下同名 PNG。卡面文字和边框是运行时画的。
 
 ## 调试接口
 

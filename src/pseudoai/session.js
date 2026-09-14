@@ -31,7 +31,10 @@ export function attachPseudoAI({ hud, director, encounter }) {
       banter.dispose();
     },
     async onTurnStart(game) {
-      return banter.speak(game, { type: 'turn_start', turnNo: game.turnNo }, { force: true });
+      return banter.speak(game, { type: 'turn_start', turnNo: game.turnNo });
+    },
+    async speakThink(game, intent) {
+      return banter.speakThink(game, intent);
     },
     async onActed(game, ev) {
       return banter.speak(game, ev);

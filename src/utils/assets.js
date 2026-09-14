@@ -23,6 +23,15 @@ const IMAGE_LIST = {
   backdrop: '/assets/backdrop.png',
   hero_mage: '/assets/hero_mage.png',
   hero_warlock: '/assets/hero_warlock.png',
+  map_act1: '/assets/ui/map_act1.png',
+  mark_combat: '/assets/ui/mark_combat.png',
+  mark_elite: '/assets/ui/mark_elite.png',
+  mark_event: '/assets/ui/mark_event.png',
+  mark_shop: '/assets/ui/mark_shop.png',
+  mark_rest: '/assets/ui/mark_rest.png',
+  mark_treasure: '/assets/ui/mark_treasure.png',
+  mark_boss: '/assets/ui/mark_boss.png',
+  pawn_player: '/assets/ui/pawn_player.png',
 };
 
 function loadImage(url) {

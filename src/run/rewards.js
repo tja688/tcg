@@ -53,8 +53,3 @@ export function removeCardFromDeck(run, cardId) {
   return false;
 }
 
-export function addRelic(run, relicId) {
-  if (!relicId || run.relics.includes(relicId)) return false;
-  run.relics.push(relicId);
-  return true;
-}

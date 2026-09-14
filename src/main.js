@@ -11,6 +11,7 @@ import { Sfx } from './audio/sfx.js';
 import { RunController } from './run/controller.js';
 import { grantRelic } from './run/state.js';
 import { getPseudoAI } from './pseudoai/index.js';
+import { snapshotCombat } from './game/snapshot.js';
 
 const errors = [];
 window.addEventListener('error', (e) => errors.push(String(e.message)));
@@ -19,7 +20,8 @@ window.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason
 async function boot() {
   const hud = new Hud();
   const params = new URLSearchParams(location.search);
-  const seed = parseInt(params.get('seed'), 10) || ((Date.now() % 900000000) + 7);
+  const parsedSeed = parseInt(params.get('seed'), 10);
+  const seed = Number.isInteger(parsedSeed) ? parsedSeed : ((Date.now() % 900000000) + 7);
 
   const fast = parseFloat(params.get('fast'));
   if (fast) gsap.globalTimeline.timeScale(fast);
@@ -53,18 +55,9 @@ async function boot() {
     state() {
       const game = run.game;
       if (!game) return { turn: 'none', over: true, run: run.debug() };
-      const sideState = (s) => ({
-        hp: s.hero.hp, armor: s.hero.armor, mana: s.mana, manaMax: s.manaMax,
-        deck: s.deck.length, discard: s.discard.length, strength: s.strength,
-        hand: s.hand.map((c) => ({ uid: c.uid, name: c.def.name, cost: c.def.cost })),
-        board: s.board.map((c) => ({
-          uid: c.uid, name: c.def.name, atk: c.attack, hp: c.health, canAttack: c.canAttack, taunt: c.taunt,
-        })),
-      });
       return {
-        turn: game.turn, turnNo: game.turnNo, over: game.over, winner: game.winner,
-        busy: director.busy, intent: game.lockedIntent,
-        player: sideState(game.player), enemy: sideState(game.enemy),
+        ...snapshotCombat(game),
+        busy: director.busy,
         run: run.debug(),
         pseudoai: getPseudoAI()?.debug?.() || null,
       };

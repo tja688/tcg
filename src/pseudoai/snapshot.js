@@ -17,9 +17,27 @@ export function boardSnapshot(game) {
   ].filter(Boolean).join('\n');
 }
 
+export function intentLine(intent) {
+  if (!intent) return '你正在权衡下一步。';
+  if (intent.type === 'play') {
+    const name = intent.card || '一张牌';
+    const cost = intent.cost != null ? `（${intent.cost}费）` : '';
+    const tgt = intent.targetName ? `，对着${intent.targetName}` : '';
+    return `你正准备：打出「${name}」${cost}${tgt}`;
+  }
+  if (intent.type === 'attack') {
+    const from = intent.attackerName || intent.card || '随从';
+    const to = intent.targetName || '目标';
+    return `你正准备：用「${from}」打${to}`;
+  }
+  return '你正在权衡下一步。';
+}
+
 export function eventLine(ev) {
   if (!ev) return '场面暂时安静。';
   switch (ev.type) {
+    case 'think':
+      return intentLine(ev);
     case 'turn_start':
       return `轮到你行动了（第 ${ev.turnNo || '?'} 回合）。`;
     case 'play': {

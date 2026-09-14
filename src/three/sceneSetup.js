@@ -83,12 +83,13 @@ export function createWorld(container, assets) {
   const lane = new THREE.Mesh(
     new THREE.PlaneGeometry(13.4, 2.55),
     new THREE.MeshBasicMaterial({
-      color: 0x3fe8ff, transparent: true, opacity: 0.045,
+      color: 0x3fe8ff, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     }),
   );
   lane.rotation.x = -Math.PI / 2;
   lane.position.set(0, 0.03, 1.95);
+  lane.visible = false;
   scene.add(lane);
 
   // ---- 远景背景板（贴近竞技场后方，倾斜面向相机，裁取星云带）----
@@ -249,9 +250,15 @@ export function createWorld(container, assets) {
   const world = {
     renderer, scene, camera, composer, bloom, grade, camPos, camTarget, screenFx,
     time: 0,
+    _laneOn: false,
     shake(m, opts) { screenFx.shake(m, opts); },
     pulseArena(s) { arenaPulse = Math.max(arenaPulse, s); },
     setPointer(nx, ny) { pointerTarget.x = nx; pointerTarget.y = ny; },
+    setPlayLane(on) {
+      world._laneOn = !!on;
+      lane.visible = !!on;
+      if (!on) lane.material.opacity = 0;
+    },
     update(dt) {
       world.time += dt;
       const t = world.time;
@@ -264,7 +271,11 @@ export function createWorld(container, assets) {
       arenaPulse *= Math.pow(0.012, dt);
       runeRing.material.opacity = 0.05 + 0.06 * (0.5 + 0.5 * Math.sin(t * 1.35)) + arenaPulse * 0.42;
       runeRing.rotation.z = t * 0.05;
-      lane.material.opacity = 0.045 + arenaPulse * 0.16;
+      if (world._laneOn) {
+        lane.material.opacity = 0.11 + 0.035 * Math.sin(t * 3.2) + arenaPulse * 0.16;
+      } else {
+        lane.material.opacity = 0;
+      }
 
       // 火光闪烁
       for (let i = 0; i < braziers.length; i++) {

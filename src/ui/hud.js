@@ -21,13 +21,18 @@ export class Hud {
     this.pDisc$ = document.getElementById('pDisc');
     this.pHand$ = document.getElementById('pHand');
     this.aim$ = document.getElementById('aimHint');
-    this.intent$ = document.getElementById('intentHud');
+    this.enemyHud$ = document.getElementById('enemyHud');
+    this.enemyHudName$ = document.getElementById('enemyHudName');
+    this.enemyHudHp$ = document.getElementById('enemyHudHp');
+    this.enemyHudIntent$ = document.getElementById('enemyHudIntent');
     this.str$ = document.getElementById('strHud');
     this.llmThink$ = document.getElementById('llmThink');
     this.banter$ = document.getElementById('enemyBanter');
     this.banterWho$ = document.getElementById('enemyBanterWho');
     this.banterText$ = document.getElementById('enemyBanterText');
     this._banterTimer = null;
+    this._intent = null;
+    this._enemy = { name: '', hp: 0, maxHp: 0, armor: 0 };
 
     this._toastTimer = null;
     this._bannerTimer = null;
@@ -50,7 +55,12 @@ export class Hud {
 
   bindSfx(sfx) {
     const btn = document.getElementById('muteBtn');
-    const sync = () => { btn.textContent = sfx.muted ? '音效：关' : '音效：开'; };
+    const sync = () => {
+      const text = sfx.muted ? '音效：关' : '音效：开';
+      const label = btn.querySelector('.btnLabel');
+      if (label) label.textContent = text;
+      else btn.textContent = text;
+    };
     btn.addEventListener('click', () => { sfx.toggleMute(); sync(); });
     sync();
   }
@@ -69,7 +79,7 @@ export class Hud {
     document.body.dataset.mode = mode;
     const combat = mode === 'combat';
     this.piles$.classList.toggle('show', combat);
-    this.intent$.classList.toggle('show', combat);
+    if (!combat) this.setEnemyStatus({ name: '', intent: null });
     if (mode === 'map') this.pill$.textContent = '选择下一处落脚';
     if (mode === 'title') this.pill$.textContent = '远征准备中…';
     if (mode === 'shop') this.pill$.textContent = '暮光货栈';
@@ -104,11 +114,34 @@ export class Hud {
   }
 
   setIntent(intent) {
-    if (!intent) {
-      this.intent$.textContent = '';
-      return;
+    this.setEnemyStatus({ intent: intent || null });
+  }
+
+  setEnemyStatus(partial = {}) {
+    if ('intent' in partial) this._intent = partial.intent || null;
+    if ('name' in partial) this._enemy.name = partial.name || '';
+    if ('hp' in partial) this._enemy.hp = partial.hp;
+    if ('maxHp' in partial) this._enemy.maxHp = partial.maxHp;
+    if ('armor' in partial) this._enemy.armor = partial.armor || 0;
+    this.refreshEnemyStatus();
+  }
+
+  refreshEnemyStatus() {
+    if (!this.enemyHud$) return;
+    const { name, hp, maxHp, armor } = this._enemy;
+    const show = document.body.dataset.mode === 'combat' && !!name;
+    this.enemyHud$.classList.toggle('show', show);
+    if (!show) return;
+    if (this.enemyHudName$) this.enemyHudName$.textContent = name;
+    if (this.enemyHudHp$) {
+      this.enemyHudHp$.textContent = armor ? `${hp}/${maxHp} · 甲${armor}` : `${hp}/${maxHp}`;
     }
-    this.intent$.textContent = `敌方预兆 · ${intent.title} · ${intent.label}`;
+    if (this.enemyHudIntent$) {
+      const intent = this._intent;
+      const label = intent ? `${intent.title} · ${intent.label}` : '';
+      this.enemyHudIntent$.textContent = label;
+      this.enemyHudIntent$.hidden = !label;
+    }
   }
 
   setStrength(ps, es) {
@@ -128,22 +161,23 @@ export class Hud {
     this.llmThink$.classList.toggle('show', !!text);
   }
 
-  showEnemyBanter(text, who, xy) {
+  showEnemyBanter(text, who, xy, opts) {
     if (!this.banter$ || !text) return;
     if (this.banterWho$) this.banterWho$.textContent = who || '';
     if (this.banterText$) this.banterText$.textContent = text;
     if (xy && Number.isFinite(xy.x) && Number.isFinite(xy.y)) {
-      const x = Math.min(window.innerWidth - 40, Math.max(40, xy.x + 110));
-      const y = Math.min(window.innerHeight - 80, Math.max(70, xy.y - 36));
+      const x = Math.min(window.innerWidth - 36, Math.max(window.innerWidth * 0.62, xy.x + 96));
+      const y = Math.min(window.innerHeight * 0.32, Math.max(86, xy.y - 8));
       this.banter$.style.left = `${x}px`;
       this.banter$.style.top = `${y}px`;
     } else {
-      this.banter$.style.left = '50%';
-      this.banter$.style.top = '17%';
+      this.banter$.style.left = '72%';
+      this.banter$.style.top = '18%';
     }
     this.banter$.classList.add('show');
     clearTimeout(this._banterTimer);
-    this._banterTimer = setTimeout(() => this.hideEnemyBanter(), 3200);
+    const hold = Number.isFinite(opts?.holdMs) ? opts.holdMs : 3200;
+    this._banterTimer = setTimeout(() => this.hideEnemyBanter(), hold);
   }
 
   hideEnemyBanter() {
