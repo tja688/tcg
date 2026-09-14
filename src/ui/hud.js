@@ -59,6 +59,12 @@ export class Hud {
 
   bindSfx(sfx) {
     this.sfx = sfx;
+    const deckBtn = document.getElementById('deckBtn');
+    if (deckBtn) {
+      deckBtn.addEventListener('click', () => {
+        if (this.onDeck) this.onDeck();
+      });
+    }
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn) {
       settingsBtn.addEventListener('click', () => {

@@ -215,7 +215,6 @@ export class Screens {
             </button>
           </div>
           ${inRun ? `<div class="settingsActs">
-            <button class="ghostBtn" type="button" data-act="deck">查看牌库</button>
             <button class="ghostBtn dangerBtn" type="button" data-act="abandon">放弃对局</button>
           </div>` : ''}
         </article>
@@ -243,14 +242,6 @@ export class Screens {
       this.sfx.toggleMute();
       syncMute();
     };
-    const deckBtn = root.querySelector('[data-act="deck"]');
-    if (deckBtn) {
-      deckBtn.onclick = () => {
-        this.sfx.cue('ui.page');
-        this.closeSettings();
-        if (this.hud.onDeck) this.hud.onDeck();
-      };
-    }
     const abandonBtn = root.querySelector('[data-act="abandon"]');
     if (abandonBtn) {
       abandonBtn.onclick = () => {

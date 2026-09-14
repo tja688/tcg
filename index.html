@@ -152,7 +152,7 @@
     }
     #enemyHud {
       position: absolute;
-      top: 118px;
+      top: 12px;
       left: 16px;
       width: min(312px, 34vw);
       display: flex;
@@ -259,6 +259,7 @@
       white-space: nowrap;
       transition: opacity 0.18s, max-height 0.18s;
     }
+    #llmThink:not(.show) { display: none; }
     #llmThink.show {
       opacity: 0.92;
       max-height: 24px;
@@ -420,7 +421,7 @@
       .shopGrid { grid-template-columns: 1fr; }
       .titleInner h1 { font-size: 40px; letter-spacing: 8px; }
       #enemyHud {
-        top: 92px;
+        top: 12px;
         left: 10px;
         width: min(280px, 46vw);
       }
@@ -435,7 +436,8 @@
 
   <div id="ui">
     <div id="topBtns">
-      <button class="iconBtn" id="settingsBtn"><span class="btnLabel">设置</span></button>
+      <button class="iconBtn" id="deckBtn" type="button" data-testid="open-deck"><span class="btnLabel">牌库</span></button>
+      <button class="iconBtn" id="settingsBtn" type="button"><span class="btnLabel">设置</span></button>
     </div>
     <div id="runStrip">
       <div class="stat dockMain">
