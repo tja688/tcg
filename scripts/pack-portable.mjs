@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tmpOut = path.join(os.tmpdir(), 'tcg-electron-release');
-const dest = path.join(root, 'release');
+const destDir = path.join(root, 'release');
+const destExe = path.join(destDir, '奥术对决.exe');
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
@@ -24,8 +25,30 @@ function run(command, args) {
   });
 }
 
-await run('npx', ['vite', 'build']);
+function taskkill(image) {
+  return new Promise((resolve) => {
+    const child = spawn('taskkill', ['/F', '/IM', image], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.on('exit', () => resolve());
+    child.on('error', () => resolve());
+  });
+}
+
+async function stopOldPortable() {
+  await Promise.all([
+    taskkill('奥术对决.exe'),
+    taskkill('ArcaneDuel-0.1.0-Portable.exe'),
+    taskkill('ArcaneDuel-Portable.exe'),
+  ]);
+}
+
+await stopOldPortable();
+await rm(destDir, { recursive: true, force: true });
 await rm(tmpOut, { recursive: true, force: true });
+
+await run('npx', ['vite', 'build']);
 await run('npx', [
   'electron-builder',
   '--win',
@@ -34,14 +57,10 @@ await run('npx', [
   `--config.directories.output=${tmpOut}`,
 ]);
 
-await rm(dest, { recursive: true, force: true });
-await mkdir(dest, { recursive: true });
+await mkdir(destDir, { recursive: true });
+const built = (await readdir(tmpOut)).find((name) => name.endsWith('.exe'));
+if (!built) throw new Error(`no portable exe in ${tmpOut}`);
+await cp(path.join(tmpOut, built), destExe);
+await rm(tmpOut, { recursive: true, force: true });
 
-const names = await readdir(tmpOut);
-for (const name of names) {
-  if (!name.endsWith('.exe')) continue;
-  await cp(path.join(tmpOut, name), path.join(dest, name));
-  console.log(`copied ${name} -> release/`);
-}
-
-console.log(`portable build ready: ${dest}`);
+console.log(`portable ready: ${destExe}`);
