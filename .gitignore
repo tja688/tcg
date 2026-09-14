@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+dist-ssr/
+
+# logs / local tooling
+*.log
+npm-debug.log*
+.playwright-cli/
+
+# env
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# editor
+.idea/
+*.swp
+
+# vite cache
+.vite/
