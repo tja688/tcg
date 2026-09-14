@@ -75,6 +75,92 @@ export function makeCardGlowTexture(size = 256) {
   return new THREE.CanvasTexture(c);
 }
 
+// 细长拖尾（火花 / 弹道余烬）
+export function makeStreakTexture(size = 128) {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = Math.floor(size * 0.4);
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  const g = ctx.createLinearGradient(0, 0, w, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.5, 'rgba(255,255,255,1)');
+  g.addColorStop(0.65, 'rgba(255,255,255,0.55)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  const vg = ctx.createLinearGradient(0, 0, 0, h);
+  vg.addColorStop(0, 'rgba(0,0,0,0.85)');
+  vg.addColorStop(0.5, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.85)');
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'source-over';
+  return new THREE.CanvasTexture(c);
+}
+
+// 四角星芒（命中火花）
+export function makeSparkTexture(size = 128) {
+  const c = canvasOf(size);
+  const ctx = c.getContext('2d');
+  const m = size / 2;
+  ctx.translate(m, m);
+  const spike = (len, thick) => {
+    ctx.beginPath();
+    ctx.moveTo(-thick, 0);
+    ctx.lineTo(0, -len);
+    ctx.lineTo(thick, 0);
+    ctx.lineTo(0, len);
+    ctx.closePath();
+    ctx.fill();
+  };
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = '#fff';
+  ctx.shadowBlur = 10;
+  spike(m * 0.92, m * 0.08);
+  ctx.rotate(Math.PI / 2);
+  spike(m * 0.92, m * 0.08);
+  ctx.rotate(Math.PI / 4);
+  spike(m * 0.48, m * 0.045);
+  ctx.rotate(Math.PI / 2);
+  spike(m * 0.48, m * 0.045);
+  const core = ctx.createRadialGradient(0, 0, 0, 0, 0, m * 0.22);
+  core.addColorStop(0, 'rgba(255,255,255,1)');
+  core.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(0, 0, m * 0.22, 0, Math.PI * 2);
+  ctx.fill();
+  return new THREE.CanvasTexture(c);
+}
+
+// 弧形斩击
+export function makeSlashTexture(size = 256) {
+  const c = canvasOf(size);
+  const ctx = c.getContext('2d');
+  ctx.translate(size / 2, size / 2);
+  ctx.rotate(-0.55);
+  ctx.lineCap = 'round';
+  const g = ctx.createLinearGradient(-size * 0.42, 0, size * 0.42, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.5, 'rgba(255,255,255,1)');
+  g.addColorStop(0.7, 'rgba(255,255,255,0.7)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.strokeStyle = g;
+  ctx.lineWidth = size * 0.09;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size * 0.4, size * 0.16, 0, 0.15, Math.PI - 0.15);
+  ctx.stroke();
+  ctx.lineWidth = size * 0.035;
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.stroke();
+  return new THREE.CanvasTexture(c);
+}
+
 // 盾徽（嘲讽标识）
 export function makeShieldTexture(size = 128) {
   const c = canvasOf(size);

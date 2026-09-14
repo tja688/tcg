@@ -224,9 +224,12 @@ export class HeroVisual {
   }
 
   flashHit() {
-    gsap.fromTo(this.hitMat, { opacity: 0.75 }, { opacity: 0, duration: 0.45, ease: 'power2.out', overwrite: 'auto' });
-    gsap.fromTo(this.pivot.rotation, { z: (Math.random() - 0.5) * 0.2 }, {
-      z: 0, duration: 0.4, ease: 'elastic.out(1.2, 0.35)', overwrite: 'auto',
+    gsap.fromTo(this.hitMat, { opacity: 0.88 }, { opacity: 0, duration: 0.42, ease: 'power2.out', overwrite: 'auto' });
+    gsap.fromTo(this.pivot.rotation, { z: (Math.random() - 0.5) * 0.28 }, {
+      z: 0, duration: 0.46, ease: 'elastic.out(1.25, 0.32)', overwrite: 'auto',
+    });
+    gsap.fromTo(this.pivot.scale, { x: 1.08, y: 0.92, z: 1 }, {
+      x: 1, y: 1, z: 1, duration: 0.36, ease: 'back.out(2.4)', overwrite: 'auto',
     });
   }
 

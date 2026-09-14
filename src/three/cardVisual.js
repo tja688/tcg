@@ -292,9 +292,24 @@ export class CardVisual {
     });
   }
 
-  flash() {
+  flash(color = 0xfff1d6) {
+    this.faceMat.uniforms.uFlashColor.value.setHex(color);
     const u = this.faceMat.uniforms.uFlash;
-    gsap.fromTo(u, { value: 0.9 }, { value: 0, duration: 0.32, ease: 'power2.out', overwrite: 'auto' });
+    gsap.fromTo(u, { value: 0.95 }, { value: 0, duration: 0.34, ease: 'power2.out', overwrite: 'auto' });
+  }
+
+  recoil(dir = null) {
+    const p = this.pivot;
+    const x = dir ? dir.x : 0;
+    const y = dir ? dir.y : 0.04;
+    const z = dir ? dir.z : 0.16;
+    gsap.killTweensOf(p.position);
+    gsap.killTweensOf(p.scale);
+    gsap.timeline()
+      .to(p.position, { x, y, z, duration: 0.055, ease: 'power3.out' }, 0)
+      .to(p.scale, { x: 1.12, y: 0.86, z: 1, duration: 0.055, ease: 'power3.out' }, 0)
+      .to(p.position, { x: 0, y: 0, z: 0, duration: 0.32, ease: 'elastic.out(1, 0.48)' })
+      .to(p.scale, { x: 1, y: 1, z: 1, duration: 0.24, ease: 'back.out(2.1)' }, '<');
   }
 
   setFaceDown(v) {
@@ -319,15 +334,13 @@ export class CardVisual {
   }
 
   // 脚环状态：hidden | ready | exhausted | taunt
+  // exhausted 只做去饱和，不再留灰色范围圈
   setRing(state) {
     if (this._ringState === state) return;
     this._ringState = state;
     gsap.killTweensOf(this.ringMat);
-    if (state === 'hidden') {
-      this.ring.visible = false;
-      return;
-    }
-    this.ring.visible = true;
+    const show = state === 'ready' || state === 'taunt';
+    this.ring.visible = show;
     if (state === 'ready') {
       this.ringMat.color.setHex(CFG.colors.readyRing);
       this.ringMat.opacity = 0.5;
@@ -337,10 +350,8 @@ export class CardVisual {
       this.ringMat.opacity = 0.4;
       gsap.to(this.ringMat, { opacity: 0.2, duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut' });
     } else {
-      this.ringMat.color.setHex(CFG.colors.exhaustRing);
-      this.ringMat.opacity = 0.28;
+      this.ringMat.opacity = 0;
     }
-    // 疲劳去饱和（保持克制，避免压暗原画）
     gsap.to(this.faceMat.uniforms.uDesat, {
       value: state === 'exhausted' ? 0.5 : 0, duration: 0.4, overwrite: 'auto',
     });
@@ -359,9 +370,18 @@ export class CardVisual {
     this.glow.renderOrder = n - 1;
   }
 
+  // 悬停 / 拖拽时关掉深度测试，避免被邻牌几何体挡住
+  setLayered(on) {
+    this.faceMat.depthTest = !on;
+    this.faceMat.depthWrite = !on;
+    this.backMat.depthTest = !on;
+    this.backMat.depthWrite = !on;
+    this.glowMat.depthTest = !on;
+  }
+
   dispose() {
     gsap.killTweensOf([this.group.position, this.group.rotation, this.group.scale]);
-    gsap.killTweensOf([this.pivot.rotation, this.pivot.scale, this.glowMat, this.ringMat]);
+    gsap.killTweensOf([this.pivot.rotation, this.pivot.position, this.pivot.scale, this.glowMat, this.ringMat]);
     this.group.removeFromParent();
     this.faceTex.dispose();
     this.faceMat.dispose();

@@ -10,6 +10,7 @@ import { Hud } from './ui/hud.js';
 import { Sfx } from './audio/sfx.js';
 import { RunController } from './run/controller.js';
 import { grantRelic } from './run/state.js';
+import { getPseudoAI } from './pseudoai/index.js';
 
 const errors = [];
 window.addEventListener('error', (e) => errors.push(String(e.message)));
@@ -65,6 +66,7 @@ async function boot() {
         busy: director.busy, intent: game.lockedIntent,
         player: sideState(game.player), enemy: sideState(game.enemy),
         run: run.debug(),
+        pseudoai: getPseudoAI()?.debug?.() || null,
       };
     },
     pos(sel) {
@@ -109,6 +111,13 @@ async function boot() {
       const h = game.sideOf(sideName).hero;
       h.hp = n;
       director.updateHp(h);
+    },
+    fx: {
+      shake: (m, opts) => world.shake(m, opts),
+      punch: (opts) => world.screenFx?.punch(opts),
+      lightning: () => effects.lightning(new THREE.Vector3(0, 1.2, -2.2)),
+      fireball: () => effects.projectile(new THREE.Vector3(0, 3.2, 2.4), new THREE.Vector3(0, 1.2, -2.2), { color: 0xff7a26, size: 1.2, arc: 2.4, element: 'fire' }),
+      heal: () => effects.heal(new THREE.Vector3(-5.5, 1.2, 4.7)),
     },
   };
 

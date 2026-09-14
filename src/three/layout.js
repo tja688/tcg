@@ -2,33 +2,37 @@ import * as THREE from 'three';
 import { CFG } from '../config.js';
 
 const L = CFG.layout;
+const F = CFG.feel;
 
-// 玩家手牌扇形
-export function handTransforms(n) {
+// 玩家手牌扇形。hoverIndex >= 0 时两侧让位，避免挡住被选中的牌
+export function handTransforms(n, hoverIndex = -1) {
   const out = [];
   const spread = Math.min(1.16, 6.6 / Math.max(n, 1));
   const mid = (n - 1) / 2;
+  const part = hoverIndex >= 0 ? Math.min(0.46, 0.58 - n * 0.028) : 0;
   for (let i = 0; i < n; i++) {
     const dx = i - mid;
+    let x = dx * spread;
+    if (part && i !== hoverIndex) x += Math.sign(i - hoverIndex) * part;
     out.push({
       pos: new THREE.Vector3(
-        dx * spread,
+        x,
         L.handY - Math.abs(dx) * 0.09,
-        L.handZ + Math.abs(dx) * 0.06 + i * 0.012,
+        L.handZ + Math.abs(dx) * 0.035 + i * 0.008,
       ),
       rot: new THREE.Euler(-0.66, -dx * 0.022, -dx * 0.062),
-      scale: 0.92,
+      scale: i === hoverIndex ? 0.92 : (hoverIndex >= 0 ? 0.86 : 0.92),
     });
   }
   return out;
 }
 
-// 悬停手牌的抬升姿态
+// 悬停手牌：抬高并略朝相机，保证叠在邻牌之前
 export function handHoverTransform(base) {
   return {
-    pos: new THREE.Vector3(base.pos.x, base.pos.y + 1.15, base.pos.z - 0.92),
-    rot: new THREE.Euler(-0.36, 0, 0),
-    scale: 1.32,
+    pos: new THREE.Vector3(base.pos.x, base.pos.y + F.hoverLiftY, base.pos.z + F.hoverLiftZ),
+    rot: new THREE.Euler(F.hoverTilt, 0, 0),
+    scale: F.hoverScale,
   };
 }
 

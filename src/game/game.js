@@ -4,6 +4,7 @@ import { runAI } from './ai.js';
 import { computeIntent } from './intent.js';
 import { hasRelic } from '../run/relics.js';
 import { getEncounter } from '../run/encounters.js';
+import { notifyPseudoAI } from '../pseudoai/session.js';
 
 let UID = 1;
 
@@ -241,6 +242,9 @@ export class Game {
     await this.checkPhaseChange();
     if (this.checkWin()) { await this.fx.gameOver(this.winner); return true; }
     this.fx.refreshIndicators();
+    if (inst.side === 'player' && (def.cost >= 4 || def.rarity === 'legendary')) {
+      notifyPseudoAI(this, { type: 'player_play', card: def.name });
+    }
     return true;
   }
 
@@ -332,6 +336,13 @@ export class Game {
     await this.checkPhaseChange();
     if (this.checkWin()) { await this.fx.gameOver(this.winner); return true; }
     this.fx.refreshIndicators();
+    if (attacker.side === 'player' && (target.kind === 'hero' || (target.kind === 'minion' && target.health <= 0))) {
+      notifyPseudoAI(this, {
+        type: 'player_attack',
+        attackerName: attacker.def?.name,
+        targetName: target.kind === 'hero' ? '你' : target.def?.name,
+      });
+    }
     return true;
   }
 
@@ -349,6 +360,9 @@ export class Game {
     if (entity.kind === 'hero') {
       entity.hp = Math.max(0, entity.hp - left);
       this.fx.updateHp(entity);
+      if (entity.side === 'enemy' && left >= 5) {
+        notifyPseudoAI(this, { type: 'hurt', amount: left, hp: entity.hp });
+      }
     } else {
       entity.health -= left;
       this.fx.updateStats(entity);
@@ -448,6 +462,7 @@ export class Game {
       this.phase += 1;
       this.lockedIntent = computeIntent(this);
       await this.fx.phaseChange?.(next.banner || '形态变化', this.lockedIntent);
+      notifyPseudoAI(this, { type: 'phase', banner: next.banner || '形态变化' });
     }
   }
 
@@ -473,7 +488,10 @@ export class Game {
     if (this.over) return true;
     if (this.enemy.hero.hp <= 0) { this.over = true; this.winner = 'player'; }
     else if (this.player.hero.hp <= 0) { this.over = true; this.winner = 'enemy'; }
-    if (this.over) this.turn = 'none';
+    if (this.over) {
+      this.turn = 'none';
+      notifyPseudoAI(this, { type: 'over', winner: this.winner });
+    }
     return this.over;
   }
 }

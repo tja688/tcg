@@ -4,35 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-
-// 调色 + 暗角
-const GradeShader = {
-  uniforms: {
-    tDiffuse: { value: null },
-    uVignette: { value: 1.22 },
-    uSat: { value: 1.1 },
-    uLift: { value: 0.012 },
-  },
-  vertexShader: /* glsl */`
-    varying vec2 vUv;
-    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
-  `,
-  fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse;
-    uniform float uVignette;
-    uniform float uSat;
-    uniform float uLift;
-    varying vec2 vUv;
-    void main() {
-      vec4 c = texture2D(tDiffuse, vUv);
-      float d = distance(vUv, vec2(0.5, 0.46));
-      c.rgb *= smoothstep(1.02, 0.32, d * uVignette);
-      float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-      c.rgb = mix(vec3(l), c.rgb, uSat) + uLift;
-      gl_FragColor = c;
-    }
-  `,
-};
+import { CombatGradeShader, ScreenFx } from './screenFx.js';
 
 export function createWorld(container, assets) {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -249,9 +221,14 @@ export function createWorld(container, assets) {
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.9, 0.8);
   composer.addPass(bloom);
-  const grade = new ShaderPass(GradeShader);
+  const grade = new ShaderPass(CombatGradeShader);
   composer.addPass(grade);
   composer.addPass(new OutputPass());
+
+  const screenFx = new ScreenFx({
+    grade, bloom, camera,
+    bleedEl: document.getElementById('fxBleed'),
+  });
 
   function resize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -264,37 +241,30 @@ export function createWorld(container, assets) {
   resize();
   window.addEventListener('resize', resize);
 
-  // ---- 震屏 / 视差 ----
-  const shakeState = { mag: 0 };
+  // ---- 震屏 / 视差 / 台面受击脉冲 ----
   const pointerTarget = { x: 0, y: 0 };
   const pointerCur = { x: 0, y: 0 };
+  let arenaPulse = 0;
 
   const world = {
-    renderer, scene, camera, composer, bloom, camPos, camTarget,
+    renderer, scene, camera, composer, bloom, grade, camPos, camTarget, screenFx,
     time: 0,
-    shake(m) { shakeState.mag = Math.max(shakeState.mag, m); },
+    shake(m, opts) { screenFx.shake(m, opts); },
+    pulseArena(s) { arenaPulse = Math.max(arenaPulse, s); },
     setPointer(nx, ny) { pointerTarget.x = nx; pointerTarget.y = ny; },
     update(dt) {
       world.time += dt;
       const t = world.time;
+      screenFx.update(dt);
 
-      // 视差
       pointerCur.x += (pointerTarget.x - pointerCur.x) * Math.min(1, dt * 3.2);
       pointerCur.y += (pointerTarget.y - pointerCur.y) * Math.min(1, dt * 3.2);
+      screenFx.applyCamera(camPos, pointerCur, camTarget);
 
-      // 相机位置 = 动画位置 + 视差 + 震屏
-      shakeState.mag *= Math.pow(0.0018, dt); // 快速衰减
-      const sm = shakeState.mag;
-      camera.position.set(
-        camPos.x + pointerCur.x * 0.55 + (Math.random() - 0.5) * sm,
-        camPos.y + pointerCur.y * -0.3 + (Math.random() - 0.5) * sm * 0.7,
-        camPos.z + (Math.random() - 0.5) * sm * 0.4,
-      );
-      camera.lookAt(camTarget);
-
-      // 符文脉冲
-      runeRing.material.opacity = 0.05 + 0.06 * (0.5 + 0.5 * Math.sin(t * 1.35));
+      arenaPulse *= Math.pow(0.012, dt);
+      runeRing.material.opacity = 0.05 + 0.06 * (0.5 + 0.5 * Math.sin(t * 1.35)) + arenaPulse * 0.42;
       runeRing.rotation.z = t * 0.05;
+      lane.material.opacity = 0.045 + arenaPulse * 0.16;
 
       // 火光闪烁
       for (let i = 0; i < braziers.length; i++) {

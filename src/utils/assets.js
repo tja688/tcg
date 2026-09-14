@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { makeGlowTexture, makeRingTexture, makeNoiseTexture, makeCardGlowTexture, makeShieldTexture } from './canvasTex.js';
+import {
+  makeGlowTexture, makeRingTexture, makeNoiseTexture, makeCardGlowTexture,
+  makeShieldTexture, makeStreakTexture, makeSparkTexture, makeSlashTexture,
+} from './canvasTex.js';
 
 const IMAGE_LIST = {
   flame_imp: '/assets/art_flame_imp.png',
@@ -63,5 +66,8 @@ export async function loadAssets(onProgress = () => {}) {
     noiseTex: makeNoiseTexture(),
     cardGlowTex: makeCardGlowTexture(),
     shieldTex: makeShieldTexture(),
+    streakTex: makeStreakTexture(),
+    sparkTex: makeSparkTexture(),
+    slashTex: makeSlashTexture(),
   };
 }

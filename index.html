@@ -22,8 +22,14 @@
     #app { position: fixed; inset: 0; }
     #app canvas { display: block; }
 
-    /* ======= UI 覆盖层 ======= */
-    #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+    #fxBleed {
+      position: fixed; inset: 0; pointer-events: none; z-index: 12;
+      opacity: 0;
+      background: radial-gradient(ellipse at center, transparent 42%, rgba(170, 12, 18, 0.62) 100%);
+    }
+
+    /* ======= UI 覆盖层（pointer-events:none 让点击穿透到 overlay）======= */
+    #ui { position: fixed; inset: 0; pointer-events: none; z-index: 24; }
 
     #brand {
       position: absolute; top: 14px; left: 20px;
@@ -131,7 +137,7 @@
 
     /* ======= 载入画面 ======= */
     #loading {
-      position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+      position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
       background: radial-gradient(ellipse at 50% 42%, #140d2b 0%, #05030c 70%);
       transition: opacity 0.9s; 
     }
@@ -198,13 +204,43 @@
     }
     #aimHint.show { opacity: 1; }
 
+    #llmThink {
+      position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+      font-size: 12px; letter-spacing: 1.2px; color: #c9c2d8;
+      padding: 4px 12px; border-radius: 999px;
+      background: rgba(10, 8, 20, 0.5);
+      border: 1px solid rgba(170, 160, 200, 0.22);
+      text-shadow: 0 2px 8px rgba(0,0,0,0.75);
+      opacity: 0; pointer-events: none; transition: opacity 0.18s;
+      white-space: nowrap;
+    }
+    #llmThink.show { opacity: 0.92; }
+
+    #enemyBanter {
+      position: absolute; left: 50%; top: 17%; transform: translate(-50%, 8px);
+      max-width: 260px; padding: 9px 14px 10px;
+      border-radius: 14px 14px 14px 5px;
+      font-size: 13.5px; line-height: 1.55; letter-spacing: 1px;
+      color: #f3e6d0; background: rgba(20, 9, 16, 0.84);
+      border: 1px solid rgba(255, 140, 110, 0.36);
+      box-shadow: 0 10px 26px rgba(0,0,0,0.45);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.22s, transform 0.22s;
+      z-index: 25;
+    }
+    #enemyBanter.show { opacity: 1; transform: translate(-50%, 0); }
+    #enemyBanterWho {
+      display: block; font-size: 10px; letter-spacing: 2px;
+      color: #ffb09f; margin-bottom: 3px;
+    }
+
     /* ======= 覆盖层 ======= */
     #overlayRoot {
-      position: fixed; inset: 0; z-index: 22; pointer-events: none;
+      position: fixed; inset: 0; z-index: 20; pointer-events: none; isolation: isolate;
     }
     #overlayRoot.active { pointer-events: auto; }
     .panel.dim {
-      position: absolute; inset: 0;
+      position: absolute; inset: 0; isolation: isolate; z-index: 1;
       background: radial-gradient(ellipse at 50% 40%, rgba(16,10,32,0.72) 0%, rgba(5,3,12,0.92) 78%);
       display: grid; place-items: center; padding: 28px;
     }
@@ -256,7 +292,7 @@
     .mapHead, .sheetHead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
     .mapSheet { width: min(1120px, 96vw); }
     .mapStage {
-      position: relative; width: 100%; height: min(58vh, 520px);
+      position: relative; isolation: isolate; width: 100%; height: min(58vh, 520px);
       margin-top: 18px; min-height: 360px;
       background: radial-gradient(ellipse at 50% 50%, rgba(36, 24, 64, 0.55), rgba(8, 6, 18, 0.35));
       border: 1px solid rgba(242, 208, 137, 0.16);
@@ -270,7 +306,6 @@
       background: radial-gradient(circle at 35% 30%, #5a3f88, #1b1230);
       border: 2px solid rgba(242,208,137,0.65); color: #fff6dd;
       box-shadow: 0 0 12px rgba(0,0,0,0.45);
-      z-index: 2;
     }
     .mapNode .ico { font-size: 20px; line-height: 1; }
     .mapNode .lab { position: absolute; bottom: -20px; font-size: 11px; letter-spacing: 1px; white-space: nowrap; color: #c9b88a; }
@@ -308,8 +343,10 @@
     .goldRead { color: var(--gold); letter-spacing: 2px; font-size: 18px; }
     .relicChip { display: inline-block; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--gold-dim); margin-right: 6px; }
     .floatLayer {
-      position: absolute; inset: 0; display: grid; place-items: center;
+      position: absolute; inset: 0; z-index: 50; isolation: isolate;
+      display: grid; place-items: center;
       background: rgba(4,2,10,0.62);
+      pointer-events: auto;
     }
     .resultBox {
       margin-top: 16px; padding: 12px 14px; border-radius: 12px;
@@ -326,6 +363,7 @@
 </head>
 <body>
   <div id="app"></div>
+  <div id="fxBleed"></div>
 
   <div id="ui">
     <div id="brand">奥术对决<small>暮光回廊 · ACT I</small></div>
@@ -347,10 +385,15 @@
       手牌 <b id="pHand">0</b> · 牌库 <b id="pDeck">0</b> · 弃牌 <b id="pDisc">0</b>
     </div>
     <div id="aimHint"></div>
+    <div id="llmThink"></div>
+    <div id="enemyBanter">
+      <span id="enemyBanterWho"></span>
+      <span id="enemyBanterText"></span>
+    </div>
     <div id="banner"></div>
     <div id="toast"></div>
     <div id="hint">
-      <b>拖拽手牌</b> 至发光区域召唤 / 施放 · <b>拖拽随从</b> 指向目标攻击 · Esc 取消<br/>
+      <b>拖拽手牌</b> 到战场空位召唤 · 指向法术可先点卡再点目标 · <b>右键 / Esc</b> 取消<br/>
       金色符印或 <b>空格</b> 结束回合 · 地图上的脉冲节点是下一跳
     </div>
     <div id="gameover"><div class="inner">
@@ -361,6 +404,13 @@
   </div>
 
   <div id="overlayRoot"></div>
+
+  <div id="sceneVeil" aria-hidden="true">
+    <div class="veilWash"></div>
+    <div class="veilSweep"></div>
+    <div class="veilLine"></div>
+    <p class="veilLabel"></p>
+  </div>
 
   <div id="loading">
     <div class="box">

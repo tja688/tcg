@@ -119,17 +119,10 @@ export class Director {
     this.vis = new Map();          // uid -> CardVisual（玩家手牌 + 双方战场）
     this.enemyHandBacks = [];      // 敌方手牌（卡背）
     this.hoverInst = null;
+    this.hoverBoardInst = null;
     this.dragInst = null;
     this._busy = 0;
     this.onCombatEnd = null;
-
-    this.handHitGeo = new THREE.PlaneGeometry(CFG.card.w * 1.1, CFG.card.h * 1.16);
-    this.handHitMat = new THREE.MeshBasicMaterial({
-      transparent: true, opacity: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
-    });
-    this.handHits = [];
-    this.handHitRoot = new THREE.Group();
-    this.scene.add(this.handHitRoot);
 
     this.dropZone = new DropZone(this.scene);
     this.intentBadge = new IntentBadge(this.scene);
@@ -179,14 +172,14 @@ export class Director {
     this.vis.clear();
     for (const v of this.enemyHandBacks) v.dispose();
     this.enemyHandBacks = [];
-    for (const m of this.handHits) {
-      m.visible = false;
-      m.userData.inst = null;
-    }
     this.hoverInst = null;
+    this.hoverBoardInst = null;
     this.dragInst = null;
-    this.dropZone.set('hidden');
+    this.dropZone.hide();
     this.intentBadge.hide();
+    this.hud?.showLlmThink?.('');
+    this.hud?.hideEnemyBanter?.();
+    this.world.screenFx?.reset();
     if (this.heroVis) {
       this.heroVis.player.group.removeFromParent();
       this.heroVis.enemy.group.removeFromParent();
@@ -200,6 +193,7 @@ export class Director {
   async startGame() { return this.run(() => this.game.start()); }
   async playerPlay(inst, opts) {
     if (!this.canAct()) return false;
+    this.dropZone.hide();
     return this.run(() => this.game.playCard(inst, opts));
   }
   async playerAttack(attacker, target) {
@@ -216,51 +210,36 @@ export class Director {
   // ---------------- 布局 ----------------
   layoutHand() {
     if (!this.game) return;
-    const hand = this.game.player.hand;
-    const ts = handTransforms(hand.length);
-    hand.forEach((inst, i) => {
+    const visible = this.game.player.hand.filter((inst) => inst !== this.dragInst);
+    const hoverIndex = this.hoverInst ? visible.indexOf(this.hoverInst) : -1;
+    const ts = handTransforms(visible.length, hoverIndex);
+    const feel = CFG.feel;
+    visible.forEach((inst, i) => {
       const v = this.vis.get(inst.uid);
-      if (!v || inst === this.dragInst) return;
+      if (!v) return;
       const hovered = inst === this.hoverInst;
       const t = hovered ? handHoverTransform(ts[i]) : ts[i];
-      v.setRenderOrder(hovered ? 60 : 10 + i);
-      gsap.to(v.group.position, { x: t.pos.x, y: t.pos.y, z: t.pos.z, duration: 0.36, ease: 'power3.out', overwrite: 'auto' });
-      gsap.to(v.group.rotation, { x: t.rot.x, y: t.rot.y, z: t.rot.z, duration: 0.36, ease: 'power3.out', overwrite: 'auto' });
-      gsap.to(v.group.scale, { x: t.scale, y: t.scale, z: 1, duration: 0.36, ease: 'power3.out', overwrite: 'auto' });
+      v.setLayered(hovered);
+      v.setRenderOrder(hovered ? 90 : 10 + i);
+      const dur = hovered ? feel.handHoverDur : feel.handRestDur;
+      gsap.to(v.group.position, { x: t.pos.x, y: t.pos.y, z: t.pos.z, duration: dur, ease: 'power3.out', overwrite: 'auto' });
+      gsap.to(v.group.rotation, { x: t.rot.x, y: t.rot.y, z: t.rot.z, duration: dur, ease: 'power3.out', overwrite: 'auto' });
+      gsap.to(v.group.scale, { x: t.scale, y: t.scale, z: 1, duration: dur, ease: 'power3.out', overwrite: 'auto' });
     });
-    this.syncHandHits();
   }
 
-  syncHandHits() {
-    if (!this.game) return;
-    const hand = this.game.player.hand;
-    const ts = handTransforms(hand.length);
-    while (this.handHits.length < hand.length) {
-      const m = new THREE.Mesh(this.handHitGeo, this.handHitMat);
-      m.userData.hit = true;
-      this.handHitRoot.add(m);
-      this.handHits.push(m);
+  setBoardHover(inst) {
+    if (this.hoverBoardInst === inst) return;
+    const prev = this.hoverBoardInst;
+    this.hoverBoardInst = inst;
+    if (prev) {
+      const v = this.vis.get(prev.uid);
+      if (v) gsap.to(v.group.scale, { x: 1, y: 1, duration: 0.16, overwrite: 'auto' });
     }
-    this.handHits.forEach((m, i) => {
-      if (i >= hand.length || hand[i] === this.dragInst) {
-        m.visible = false;
-        m.userData.inst = null;
-        return;
-      }
-      const t = ts[i];
-      const hovered = hand[i] === this.hoverInst;
-      m.visible = true;
-      m.position.copy(t.pos);
-      if (hovered) {
-        m.position.y += 0.62;
-        m.scale.set(1.18, 1.62, 1);
-      } else {
-        m.scale.set(1, 1, 1);
-      }
-      m.rotation.copy(t.rot);
-      m.userData.inst = hand[i];
-      m.userData.cardVisual = this.vis.get(hand[i].uid);
-    });
+    if (inst) {
+      const v = this.vis.get(inst.uid);
+      if (v) gsap.to(v.group.scale, { x: 1.07, y: 1.07, duration: 0.16, overwrite: 'auto' });
+    }
   }
 
   layoutEnemyHand() {
@@ -284,6 +263,7 @@ export class Director {
       const v = this.vis.get(m.uid);
       if (!v) return;
       const t = ts[i];
+      v.setLayered(false);
       v.setRenderOrder(10 + i);
       v.syncBoardDecor();
       gsap.to(v.group.position, { x: t.pos.x, y: t.pos.y, z: t.pos.z, duration: 0.32, ease: 'power3.out', overwrite: 'auto' });
@@ -304,10 +284,6 @@ export class Director {
   meshOf(entity) {
     if (entity.kind === 'hero') return this.heroVis[entity.side].portrait;
     return this.vis.get(entity.uid)?.face || null;
-  }
-
-  handMeshes() {
-    return this.handHits.filter((m) => m.visible && m.userData.inst);
   }
 
   boardMeshes(side) {
@@ -356,12 +332,15 @@ export class Director {
   //  fx 接口实现（供 Game 调用）
   // =====================================================================
   async intro() {
+    this.world.screenFx?.reset();
+    this.world.screenFx?.setLetterbox(0.13, 0.01);
     this.world.camPos.y = 22;
     this.world.camPos.z = 24;
     this.hud.setTurnPill(0, 'none', false);
     await gsap.to(this.world.camPos, {
       y: 13.2, z: 12.2, duration: 2.0, ease: 'power3.inOut', delay: 0.15,
     });
+    this.world.screenFx?.setLetterbox(0, 0.7);
   }
 
   async turnBanner(side, turnNo) {
@@ -482,8 +461,13 @@ export class Director {
       tl.to(v.group.position, { y: ts.pos.y + 0.8, duration: 0.15, ease: 'power1.out' }, 0);
       tl.to(v.group.position, { y: ts.pos.y, duration: 0.14, ease: 'power3.in' }, 0.15);
       await tl;
+      v.setLayered(false);
       this.effects.summonImpact(ts.pos, inst.def.tint || 0x9fd4ff);
-      this.world.shake(0.16);
+      if (inst.def.rarity === 'legendary') {
+        this.world.screenFx?.punch({
+          letterbox: 0.06, bloom: 0.24, tint: inst.def.tint || 0xffa726, tintAmt: 0.2,
+        });
+      }
       v.syncBoardDecor();
       this.layoutBoard(side);
     } else {
@@ -497,7 +481,11 @@ export class Director {
       tl.to(v.group.position, { y: ts.pos.y, duration: 0.14, ease: 'power3.in' }, 0.21);
       await tl;
       this.effects.summonImpact(ts.pos, inst.def.tint || 0x9fd4ff);
-      this.world.shake(0.16);
+      if (inst.def.rarity === 'legendary') {
+        this.world.screenFx?.punch({
+          letterbox: 0.06, bloom: 0.24, tint: inst.def.tint || 0xffa726, tintAmt: 0.2,
+        });
+      }
       v.syncBoardDecor();
       this.layoutBoard(side);
     }
@@ -550,6 +538,7 @@ export class Director {
         this.particles.burst(v.group.position.clone(), {
           count: 18, speed: 2.8, color: inst.def.tint || 0xb45cff, size: 0.26, life: 0.6, gravity: 0.4,
         });
+        this.world.screenFx?.punch({ tint: inst.def.tint || 0xb45cff, tintAmt: 0.12, bloom: 0.12 });
         const t2 = gsap.timeline();
         t2.to(v.faceMat.uniforms.uOpacity, { value: 0, duration: 0.3 }, 0.05);
         t2.to(v.backMat, { opacity: 0, duration: 0.3 }, 0.05);
@@ -566,6 +555,7 @@ export class Director {
       this.particles.burst(v.group.position.clone(), {
         count: 18, speed: 2.8, color: inst.def.tint || 0xb45cff, size: 0.26, life: 0.6, gravity: 0.4,
       });
+      this.world.screenFx?.punch({ tint: inst.def.tint || 0xb45cff, tintAmt: 0.12, bloom: 0.12 });
       const t2 = gsap.timeline();
       t2.to(v.faceMat.uniforms.uOpacity, { value: 0, duration: 0.32 }, 0);
       t2.to(v.backMat, { opacity: 0, duration: 0.32 }, 0);
@@ -578,19 +568,12 @@ export class Director {
   async projectile(vfx, side, target) {
     const to = this.posOf(target);
     const from = this.castOrigin[side].clone();
-    if (vfx === 'lightning') {
-      await this.effects.lightning(to);
-    } else if (vfx === 'fireball') {
-      await this.effects.projectile(from, to, { color: 0xff7a26, size: 1.2, arc: 2.4 });
-    } else {
-      await this.effects.projectile(from, to, { color: 0xb45cff, size: 0.85, arc: 1.8 });
-    }
+    await this.effects.castBolt(vfx, from, to);
   }
 
   async aoeStorm(targetSideName) {
     const board = this.game.sideOf(targetSideName).board;
     const positions = board.map((m) => this.posOf(m));
-    this.world.shake(0.3);
     await this.effects.firestorm(positions);
   }
 
@@ -608,18 +591,30 @@ export class Director {
 
   damagePop(entity, n) {
     const pos = this.posOf(entity).add(new THREE.Vector3(0, 0.7, 0.3));
-    this.effects.damageNumber(pos, `-${n}`, '#ff6a55');
+    const heavy = n >= 6;
+    this.effects.damageNumber(pos, `-${n}`, heavy ? '#ffe08a' : '#ff6a55', n);
+    const away = new THREE.Vector3(0, 0.05, entity.side === 'player' ? 0.22 : -0.22);
     if (entity.kind === 'hero') {
       this.heroVis[entity.side].flashHit();
+      this.world.screenFx?.punch({
+        flash: n >= 5 ? 0.16 : 0.07,
+        aberration: n >= 4 ? 0.48 : 0.2,
+        shake: 0.1 + n * 0.026,
+        bleed: entity.side === 'player' ? Math.min(0.88, 0.26 + n * 0.07) : 0,
+        tint: 0xff4028,
+        tintAmt: entity.side === 'player' ? 0.14 : 0.06,
+      });
     } else {
-      this.vis.get(entity.uid)?.flash();
+      const v = this.vis.get(entity.uid);
+      v?.flash(0xffe6c8);
+      v?.recoil(away);
     }
   }
 
   healPop(entity, n) {
     if (n <= 0) return;
     const pos = this.posOf(entity).add(new THREE.Vector3(0, 0.7, 0.3));
-    this.effects.damageNumber(pos, `+${n}`, '#7dff9e');
+    this.effects.damageNumber(pos, `+${n}`, '#7dff9e', n);
   }
 
   async attackLunge(attacker, target) {
@@ -630,7 +625,10 @@ export class Director {
     const idx = board.indexOf(attacker);
     const t = boardTransforms(board.length, side)[Math.max(0, idx)];
     v._home = t;
-    await this.effects.attackLunge(v, this.posOf(target));
+    await this.effects.attackLunge(v, this.posOf(target), {
+      tint: attacker.def.tint || 0xffcf8a,
+      power: attacker.attack,
+    });
   }
 
   async attackRecover(attacker) {
@@ -674,7 +672,9 @@ export class Director {
   async phaseChange(banner, intent) {
     this.hud.banner(banner, 'enemy');
     this.sfx.rumble();
-    this.world.shake(0.22);
+    this.world.screenFx?.punch({
+      letterbox: 0.055, shake: 0.24, vignette: 0.16, tint: 0xff5040, tintAmt: 0.14, bloom: 0.12,
+    });
     if (intent) this.intentBadge.show(intent);
     await sleep(900);
   }
@@ -684,26 +684,29 @@ export class Director {
   }
   async debuffEffect(target) {
     this.sfx.cast();
-    await this.effects.flourish(this.posOf(target), 0xc86bff);
+    await this.effects.shadowDrain(this.posOf(target));
   }
   async armorEffect(hero, n) {
     this.sfx.chime();
     this.blockPop(hero, n);
-    await this.effects.flourish(this.posOf(hero), 0x7ec8ff);
+    await this.effects.frostShield(this.posOf(hero));
   }
   blockPop(entity, n) {
     const pos = this.posOf(entity).add(new THREE.Vector3(0.2, 0.55, 0.2));
-    this.effects.damageNumber(pos, `甲${n}`, '#9fd0ff');
+    this.effects.damageNumber(pos, `甲${n}`, '#9fd0ff', n);
   }
   async heroPowerVfx(kind, target) {
     const pos = this.posOf(target);
     if (kind === 'attack') {
-      this.world.shake(0.18);
-      await this.effects.projectile(this.posOf(this.game.enemy.hero), pos, { color: 0xff6a55, size: 0.9, arc: 1.6 });
+      await this.effects.projectile(this.posOf(this.game.enemy.hero), pos, {
+        color: 0xff6a55, size: 0.95, arc: 1.6, element: 'fire',
+      });
     } else if (kind === 'defend') {
-      await this.effects.flourish(this.posOf(this.game.enemy.hero), 0x7ec8ff);
+      await this.effects.frostShield(this.posOf(this.game.enemy.hero));
+    } else if (kind === 'debuff') {
+      await this.effects.shadowDrain(pos);
     } else {
-      await this.effects.flourish(pos, kind === 'buff' ? 0xffd166 : 0xc86bff);
+      await this.effects.flourish(pos, 0xffd166);
     }
   }
 
@@ -716,6 +719,7 @@ export class Director {
       this.effects.victoryBurst();
     } else {
       this.sfx.defeat();
+      this.world.screenFx?.cinematicLose();
     }
     await sleep(650);
     if (this.onCombatEnd) await this.onCombatEnd(winner);

@@ -112,7 +112,7 @@ export const CARDS = {
 
   holy_shock: {
     id: 'holy_shock', name: '圣击', type: 'spell', cost: 1,
-    rarity: 'common', spell: { kind: 'damage', amount: 2, target: 'enemy-any', vfx: 'lightning' },
+    rarity: 'common', spell: { kind: 'damage', amount: 2, target: 'enemy-any', vfx: 'holy' },
     desc: '对一个敌方角色造成 2 点伤害。', art: 'healing_light', tint: 0xffe08a,
   },
   inner_flame: {
@@ -132,7 +132,7 @@ export const CARDS = {
   },
   shadow_bolt: {
     id: 'shadow_bolt', name: '暗影箭', type: 'spell', cost: 3,
-    rarity: 'rare', spell: { kind: 'damage', amount: 4, target: 'enemy-any', vfx: 'fireball' },
+    rarity: 'rare', spell: { kind: 'damage', amount: 4, target: 'enemy-any', vfx: 'shadow' },
     desc: '对一个敌方角色造成 4 点伤害。', art: 'shadow_assassin', tint: 0x8a4cff,
   },
   mind_splinter: {

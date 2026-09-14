@@ -20,6 +20,21 @@ export const CFG = {
     dropZone: { y: 0.04, z: 1.95, w: 13.6, d: 2.7 },
   },
 
+  // 操作手感：手牌弹出 / 邻牌让位 / 拖拽阈值
+  feel: {
+    hoverLiftY: 1.38,
+    hoverLiftZ: 0.36,
+    hoverScale: 1.26,
+    hoverTilt: -0.2,
+    handPart: 0.5,
+    handHoverDur: 0.18,
+    handRestDur: 0.24,
+    dragThreshold: 10,
+    hoverSliverSlack: 0.02,
+    hoverCardHalfX: 0.09,
+    hoverCardHalfY: 0.26,
+  },
+
   rules: {
     maxBoard: 6, maxHand: 10, maxMana: 10,
     heroHp: 40, startHandPlayer: 4, startHandEnemy: 4,

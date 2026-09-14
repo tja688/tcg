@@ -23,6 +23,11 @@ export class Hud {
     this.aim$ = document.getElementById('aimHint');
     this.intent$ = document.getElementById('intentHud');
     this.str$ = document.getElementById('strHud');
+    this.llmThink$ = document.getElementById('llmThink');
+    this.banter$ = document.getElementById('enemyBanter');
+    this.banterWho$ = document.getElementById('enemyBanterWho');
+    this.banterText$ = document.getElementById('enemyBanterText');
+    this._banterTimer = null;
 
     this._toastTimer = null;
     this._bannerTimer = null;
@@ -67,8 +72,18 @@ export class Hud {
     this.intent$.classList.toggle('show', combat);
     if (mode === 'map') this.pill$.textContent = '选择下一处落脚';
     if (mode === 'title') this.pill$.textContent = '远征准备中…';
+    if (mode === 'shop') this.pill$.textContent = '暮光货栈';
+    if (mode === 'event') this.pill$.textContent = '回廊事件';
+    if (mode === 'rest') this.pill$.textContent = '余烬篝火';
+    if (mode === 'treasure') this.pill$.textContent = '发现宝藏';
+    if (mode === 'reward') this.pill$.textContent = '拾取战利品';
+    if (mode === 'runover') this.pill$.textContent = '远征结束';
     this.runStrip$.classList.toggle('show', mode !== 'title' && mode !== 'loading');
-    if (mode !== 'combat') this.setAimHint('');
+    if (mode !== 'combat') {
+      this.setAimHint('');
+      this.showLlmThink('');
+      this.hideEnemyBanter();
+    }
   }
 
   refreshRun(run) {
@@ -105,6 +120,35 @@ export class Hud {
     if (!this.aim$) return;
     this.aim$.textContent = msg || '';
     this.aim$.classList.toggle('show', !!msg);
+  }
+
+  showLlmThink(text) {
+    if (!this.llmThink$) return;
+    this.llmThink$.textContent = text || '';
+    this.llmThink$.classList.toggle('show', !!text);
+  }
+
+  showEnemyBanter(text, who, xy) {
+    if (!this.banter$ || !text) return;
+    if (this.banterWho$) this.banterWho$.textContent = who || '';
+    if (this.banterText$) this.banterText$.textContent = text;
+    if (xy && Number.isFinite(xy.x) && Number.isFinite(xy.y)) {
+      const x = Math.min(window.innerWidth - 40, Math.max(40, xy.x + 110));
+      const y = Math.min(window.innerHeight - 80, Math.max(70, xy.y - 36));
+      this.banter$.style.left = `${x}px`;
+      this.banter$.style.top = `${y}px`;
+    } else {
+      this.banter$.style.left = '50%';
+      this.banter$.style.top = '17%';
+    }
+    this.banter$.classList.add('show');
+    clearTimeout(this._banterTimer);
+    this._banterTimer = setTimeout(() => this.hideEnemyBanter(), 3200);
+  }
+
+  hideEnemyBanter() {
+    if (!this.banter$) return;
+    this.banter$.classList.remove('show');
   }
 
   banner(text, side) {

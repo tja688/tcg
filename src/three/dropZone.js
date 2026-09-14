@@ -5,47 +5,22 @@ import { TextSprite } from '../utils/canvasTex.js';
 
 const L = CFG.layout;
 
-function dashedTex() {
-  const c = document.createElement('canvas');
-  c.width = 512; c.height = 256;
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0, 0, 512, 256);
-  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-  ctx.lineWidth = 10;
-  ctx.setLineDash([22, 16]);
-  ctx.strokeRect(18, 18, 476, 220);
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.fillRect(28, 28, 456, 200);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
+// 落点提示：只在拖到合法空位时短暂出现，松手立刻关掉。
+// 不再铺整块战场虚线框。
 export class DropZone {
   constructor(scene) {
     this.group = new THREE.Group();
     this.group.visible = false;
     this.state = 'hidden';
-
-    this.tex = dashedTex();
-    this.mat = new THREE.MeshBasicMaterial({
-      map: this.tex, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    const dz = L.dropZone;
-    this.plane = new THREE.Mesh(new THREE.PlaneGeometry(dz.w, dz.d), this.mat);
-    this.plane.rotation.x = -Math.PI / 2;
-    this.plane.position.set(0, dz.y, dz.z);
-    this.plane.renderOrder = 40;
-    this.group.add(this.plane);
+    this._slot = null;
 
     this.glowMat = new THREE.MeshBasicMaterial({
       color: 0x53ffb0, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
-    this.glow = new THREE.Mesh(new THREE.PlaneGeometry(dz.w * 0.96, dz.d * 0.9), this.glowMat);
+    this.glow = new THREE.Mesh(new THREE.RingGeometry(0.62, 1.08, 48), this.glowMat);
     this.glow.rotation.x = -Math.PI / 2;
-    this.glow.position.set(0, dz.y + 0.01, dz.z);
+    this.glow.position.y = L.dropZone.y + 0.02;
     this.glow.renderOrder = 39;
     this.group.add(this.glow);
 
@@ -62,10 +37,11 @@ export class DropZone {
     this.group.add(this.ghost);
 
     this.label = new TextSprite({
-      text: '放置于此', font: '700 72px "Microsoft YaHei"', color: '#c8ffe0',
-      canvasW: 640, canvasH: 160, worldH: 0.48, strokeWidth: 8,
+      text: '放置于此', font: '700 64px "Microsoft YaHei"', color: '#c8ffe0',
+      canvasW: 640, canvasH: 160, worldH: 0.38, strokeWidth: 8,
     });
-    this.label.sprite.position.set(0, 1.55, L.rowZ.player);
+    this.label.sprite.position.set(0, 1.35, L.rowZ.player);
+    this.label.material.opacity = 0;
     this.group.add(this.label.sprite);
 
     scene.add(this.group);
@@ -78,48 +54,66 @@ export class DropZone {
     return new THREE.Vector3((slot - mid) * spacing, L.minionY + 0.08, L.rowZ.player);
   }
 
+  hide() {
+    if (this.state === 'hidden' && !this.group.visible) return;
+    this.state = 'hidden';
+    this._slot = null;
+    gsap.killTweensOf([this.glowMat, this.ghostMat, this.label.material]);
+    this.group.visible = false;
+    this.ghost.visible = false;
+    this.glowMat.opacity = 0;
+    this.ghostMat.opacity = 0;
+    this.label.material.opacity = 0;
+  }
+
   set(state, { slot = null, n = 0 } = {}) {
-    if (state === 'hidden') {
-      this.state = 'hidden';
-      this.group.visible = false;
-      this.ghost.visible = false;
+    if (state === 'hidden' || state === 'cancel') {
+      this.hide();
       return;
     }
-    this.group.visible = true;
+    if (this.state === state && this._slot === slot) return;
+
     this.state = state;
+    this._slot = slot;
+    this.group.visible = true;
+
     const valid = state === 'valid';
     const cast = state === 'cast';
     const color = valid || cast ? 0x53ffb0 : 0xff6a55;
-    this.mat.color.setHex(color);
     this.glowMat.color.setHex(color);
-    gsap.to(this.mat, { opacity: 0.72, duration: 0.16, overwrite: 'auto' });
-    gsap.to(this.glowMat, { opacity: valid || cast ? 0.18 : 0.1, duration: 0.16, overwrite: 'auto' });
     this.label.setText(
-      valid ? '放置于此' : cast ? '松手施放' : '松手取消',
+      valid ? '放置于此' : '松手施放',
       valid || cast ? '#c8ffe0' : '#ffc4b8',
     );
 
     if (valid && slot != null) {
       const p = this.slotPos(slot, n);
+      this.glow.position.set(p.x, L.dropZone.y + 0.02, p.z);
+      this.label.sprite.position.set(p.x, 1.42, p.z + 0.15);
       this.ghost.visible = true;
       this.ghost.position.copy(p);
-      gsap.to(this.ghostMat, { opacity: 0.38, duration: 0.12, overwrite: 'auto' });
+      gsap.to(this.ghostMat, { opacity: 0.34, duration: 0.1, overwrite: 'auto' });
     } else {
-      gsap.to(this.ghostMat, { opacity: 0, duration: 0.12, overwrite: 'auto' });
+      this.glow.position.set(0, L.dropZone.y + 0.02, 0.35);
+      this.label.sprite.position.set(0, 1.55, 0.2);
+      gsap.to(this.ghostMat, { opacity: 0, duration: 0.08, overwrite: 'auto' });
       this.ghost.visible = false;
     }
+
+    gsap.to(this.glowMat, { opacity: 0.55, duration: 0.1, overwrite: 'auto' });
+    gsap.to(this.label.material, { opacity: 0.92, duration: 0.1, overwrite: 'auto' });
   }
 
   update(t) {
     if (!this.group.visible) return;
-    this.glowMat.opacity = (this.state === 'cancel' ? 0.08 : 0.14) + 0.06 * Math.sin(t * 5);
+    const base = this.state === 'cast' ? 0.42 : 0.5;
+    this.glowMat.opacity = base + 0.1 * Math.sin(t * 6);
     this.ghost.position.y = L.minionY + 0.08 + Math.sin(t * 4) * 0.04;
   }
 
   dispose() {
+    this.hide();
     this.group.removeFromParent();
-    this.tex.dispose();
-    this.mat.dispose();
     this.glowMat.dispose();
     this.ghostMat.dispose();
     this.label.dispose();

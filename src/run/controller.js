@@ -6,8 +6,23 @@ import { generateShop, canAfford } from './shop.js';
 import { makeCombatReward, makeTreasureReward, applyGold, addCardToDeck, removeCardFromDeck } from './rewards.js';
 import { randomRelic, getRelic } from './relics.js';
 import { Game } from '../game/game.js';
-import { Screens } from '../ui/screens.js';
+import { Screens, TYPE_META } from '../ui/screens.js';
 import { mulberry32 } from '../utils/rng.js';
+import { attachPseudoAI, detachPseudoAI } from '../pseudoai/index.js';
+
+function veilFor(node) {
+  const meta = TYPE_META[node.type] || { label: '前进' };
+  if (node.encounterId) {
+    const enc = getEncounter(node.encounterId);
+    return { title: enc?.name || meta.label, kind: node.type };
+  }
+  if (node.eventId) {
+    const ev = getEvent(node.eventId);
+    return { title: ev?.title || meta.label, kind: 'event' };
+  }
+  const titles = { shop: '暮光货栈', rest: '余烬篝火', treasure: '匣中遗珍' };
+  return { title: titles[node.type] || meta.label, kind: node.type };
+}
 
 export class RunController {
   constructor({ director, input, hud, sfx, assets, seed }) {
@@ -36,32 +51,40 @@ export class RunController {
     this.rng = mulberry32(this.seed);
     this.run = createRun(this.rng, this.seed);
     this.hud.refreshRun(this.run);
-    this.showMap();
+    await this.showMap();
   }
 
-  showMap() {
+  async showMap() {
     this.input.enabled = false;
+    detachPseudoAI();
     this.director.teardownCombat();
     this.game = null;
     this.input.game = null;
     this.hud.setMode('map');
     this.hud.refreshRun(this.run);
-    this.screens.showMap(this.run, {
+    await this.screens.showMap(this.run, {
       onNode: (id) => this.enter(id),
       onDeck: () => this.screens.showDeck(this.run),
     });
   }
 
   async enter(id) {
+    if (this._navLock) return;
     if (!nodeReachable(this.run, id)) {
       this.hud.toast('这条路还不能走');
       this.sfx.error();
       return;
     }
-    enterNode(this.run, id);
-    this.screens.clear();
-    const node = getNode(this.run.map, id);
-    this.hud.refreshRun(this.run);
+    this._navLock = true;
+    let node;
+    try {
+      enterNode(this.run, id);
+      node = getNode(this.run.map, id);
+      this.hud.refreshRun(this.run);
+      await this.screens.depart(veilFor(node));
+    } finally {
+      this._navLock = false;
+    }
     switch (node.type) {
       case 'combat':
       case 'elite':
@@ -82,7 +105,7 @@ export class RunController {
         break;
       default:
         completeCurrent(this.run);
-        this.showMap();
+        await this.showMap();
     }
   }
 
@@ -102,7 +125,10 @@ export class RunController {
     this.director.bindGame(game);
     this.input.game = game;
     this.input.enabled = true;
+    const sess = attachPseudoAI({ hud: this.hud, director: this.director, encounter });
+    void sess.prepare();
     this.director.onCombatEnd = (winner) => this.afterCombat(winner, kind);
+    await this.screens.unveil();
     await this.director.startGame();
   }
 
@@ -126,13 +152,15 @@ export class RunController {
     applyGold(this.run, reward.gold);
     if (reward.relic) grantRelic(this.run, reward.relic);
     this.hud.refreshRun(this.run);
+    this.hud.setMode('reward');
+    await this.screens.depart({ title: '战利品', kind: 'reward' });
     await this.screens.showReward(reward, this.run, {
       take: (cardId) => {
         if (cardId) addCardToDeck(this.run, cardId);
         this.hud.refreshRun(this.run);
       },
     });
-    this.showMap();
+    await this.showMap();
   }
 
   async openEvent(eventId) {
@@ -167,11 +195,13 @@ export class RunController {
     }
     if (result?.combat) {
       completeCurrent(this.run);
+      const enc = getEncounter(result.combat);
+      await this.screens.depart({ title: enc?.name || '遭遇', kind: 'combat' });
       await this.startCombat(result.combat, 'event');
       return;
     }
     completeCurrent(this.run);
-    this.showMap();
+    await this.showMap();
   }
 
   async openShop() {
@@ -215,7 +245,7 @@ export class RunController {
       },
     });
     completeCurrent(this.run);
-    this.showMap();
+    await this.showMap();
   }
 
   async openRest() {
@@ -225,7 +255,7 @@ export class RunController {
       this.run.hp = Math.min(this.run.maxHp, this.run.hp + heal);
     });
     completeCurrent(this.run);
-    this.showMap();
+    await this.showMap();
   }
 
   async openTreasure() {
@@ -237,13 +267,14 @@ export class RunController {
       this.hud.refreshRun(this.run);
     });
     completeCurrent(this.run);
-    this.showMap();
+    await this.showMap();
   }
 
   async finishRun(win) {
     this.input.enabled = false;
     this.director.teardownCombat();
     this.hud.setMode('runover');
+    await this.screens.depart({ title: win ? '远征完成' : '远征失败', kind: win ? 'win' : 'lose' });
     await this.screens.showRunOver(win, this.run);
     this.seed = ((this.seed * 1103515245) + 12345) >>> 0;
     await this.beginRun();
