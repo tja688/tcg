@@ -173,7 +173,7 @@
     .muted { opacity: 0.55; }
 
     #strHud {
-      position: absolute; pointer-events: none;
+      position: absolute; pointer-events: auto;
       left: 20px; top: auto; bottom: 22%;
       font-size: 12px; letter-spacing: 1px; color: #ffd166;
       text-shadow: 0 2px 8px rgba(0,0,0,0.7);
@@ -292,20 +292,25 @@
       #llmThink.show { animation: none; opacity: 0.92; }
       .banterItem, .banterItem.out { animation: none; }
     }
-    #enemySkillTip {
-      position: absolute; z-index: 27; pointer-events: none;
+    #enemySkillTip,
+    #infoTip {
+      position: absolute; z-index: 40; pointer-events: none;
       width: 220px; padding: 10px 14px 12px;
       color: #efe6d0;
     }
-    #enemySkillTip[hidden] { display: none !important; }
-    #enemySkillTip b {
+    #enemySkillTip[hidden],
+    #infoTip[hidden] { display: none !important; }
+    #enemySkillTip b,
+    #infoTip b {
       display: block; color: #ffe9b8; letter-spacing: 0.16em;
       font-size: 13px; margin-bottom: 4px;
     }
-    #enemySkillTip p {
+    #enemySkillTip p,
+    #infoTip p {
       margin: 0; font-size: 12.5px; line-height: 1.55; color: #f3e6d0;
     }
-    #enemySkillTip small {
+    #enemySkillTip small,
+    #infoTip small {
       display: block; margin-top: 6px; color: #ffb09f;
       letter-spacing: 0.08em; font-size: 11px;
     }
@@ -466,6 +471,7 @@
       </div>
       <div id="enemySkillTip" hidden></div>
     </div>
+    <div id="infoTip" hidden></div>
     <div id="strHud"></div>
     <div id="aimHint"></div>
     <div id="banner"></div>

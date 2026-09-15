@@ -1,7 +1,8 @@
-import { getRelic } from '../run/relics.js';
 import { resetThinkHud } from '../pseudoai/think.js';
 import { imageSrc } from '../utils/assets.js';
 import { describeSkill, skillSignature } from './enemySkills.js';
+import { TERMS, cardTipInfo, relicTipInfo } from './glossary.js';
+import { bindTip, hideTip, isTipSource, showTip, showTipAt } from './tooltip.js';
 
 const PLAYER_NAME = '晨曦法师';
 const BANTER_FADE_MS = 420;
@@ -37,6 +38,7 @@ export class Hud {
     this.enemySkillTip$ = document.getElementById('enemySkillTip');
     this.str$ = document.getElementById('strHud');
     this.llmThink$ = document.getElementById('llmThink');
+    this._inspectUid = 0;
     this._intent = null;
     this._enemy = { name: '', hp: 0, maxHp: 0, armor: 0, portrait: '' };
     this._combatHero = null;
@@ -56,6 +58,12 @@ export class Hud {
       if (this.onAbandon) this.onAbandon();
       else location.href = location.pathname;
     });
+
+    if (this.hp$) bindTip(this.hp$, TERMS.hp, { prefer: 'above' });
+    if (this.armor$) bindTip(this.armor$, TERMS.armor, { prefer: 'above' });
+    if (this.str$) {
+      bindTip(this.str$, () => (this.str$.textContent ? TERMS.strength : null), { prefer: 'above' });
+    }
   }
 
   bindSfx(sfx) {
@@ -89,6 +97,8 @@ export class Hud {
     const combat = mode === 'combat';
     if (!combat) {
       this._combatHero = null;
+      this._inspectUid = 0;
+      hideTip();
       this.setEnemyStatus({ name: '', intent: null });
       this.anchorEnemy(null);
       this.anchorPlayerHud(null);
@@ -109,10 +119,14 @@ export class Hud {
     if (this.gold$) this.gold$.textContent = String(run.gold);
     if (this.floor$) this.floor$.textContent = `第 ${run.floor + 1} 层`;
     if (this.relics$) {
+      hideTip();
       this.relics$.innerHTML = (run.relics || []).map((id) => {
-        const r = getRelic(id);
-        return `<span class="miniRelic" data-relic="${id}" title="${r?.desc || ''}">${r?.icon || '?'}${r?.name || id}</span>`;
+        const info = relicTipInfo(id);
+        return `<span class="miniRelic" data-relic="${id}" tabindex="0">${info?.title || id}</span>`;
       }).join('') || '<span class="muted">无遗物</span>';
+      this.relics$.querySelectorAll('[data-relic]').forEach((el) => {
+        bindTip(el, () => relicTipInfo(el.dataset.relic), { prefer: 'above' });
+      });
     }
     this.refreshPlayerVitals();
   }
@@ -183,34 +197,30 @@ export class Hud {
       </button>`;
     const btn = this.enemySkills$.querySelector('.enemySkill');
     if (!btn) return;
-    const show = () => this._showSkillTip(info, btn);
-    btn.addEventListener('mouseenter', show);
-    btn.addEventListener('focus', show);
-    btn.addEventListener('mouseleave', () => this._hideSkillTip());
-    btn.addEventListener('blur', () => this._hideSkillTip());
+    bindTip(btn, { title: info.title, body: info.body, extra: info.label }, { prefer: 'left', width: 240 });
   }
 
   _showSkillTip(info, btn) {
-    const tip = this.enemySkillTip$;
-    if (!tip || !btn) return;
-    tip.innerHTML = `<b>${info.title}</b><p>${info.body}</p>${info.label ? `<small>${info.label}</small>` : ''}`;
-    tip.hidden = false;
-    const r = btn.getBoundingClientRect();
-    const pad = 10;
-    let left = r.right;
-    let top = r.bottom + 8;
-    const tw = Math.min(240, window.innerWidth - 16);
-    if (left - tw < pad) left = Math.min(window.innerWidth - pad, r.left + tw);
-    if (top + 120 > window.innerHeight - pad) top = Math.max(pad, r.top - 128);
-    tip.style.width = `${tw}px`;
-    tip.style.left = `${left}px`;
-    tip.style.top = `${top}px`;
-    tip.style.transform = 'translateX(-100%)';
+    showTip(btn, { title: info.title, body: info.body, extra: info.label }, { prefer: 'left', width: 240 });
   }
 
   _hideSkillTip() {
-    if (!this.enemySkillTip$) return;
-    this.enemySkillTip$.hidden = true;
+    hideTip();
+  }
+
+  inspectCard(inst, ev) {
+    if (!inst?.def || !ev) {
+      if (this._inspectUid) {
+        this._inspectUid = 0;
+        if (isTipSource('inspect')) hideTip();
+      }
+      return;
+    }
+    if (this._inspectUid === inst.uid && isTipSource('inspect')) return;
+    this._inspectUid = inst.uid;
+    showTipAt(ev.clientX, ev.clientY, cardTipInfo(inst.def, inst), {
+      prefer: 'above', width: 268, source: 'inspect',
+    });
   }
 
   anchorPlayerHud(pos) {

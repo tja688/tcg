@@ -47,10 +47,10 @@ export function describeSkill(intent) {
       body = `下回合对你的英雄造成 ${value} 点伤害。`;
       break;
     case 'defend':
-      body = `为自己获得 ${value} 点护甲。`;
+      body = `自己获得 ${value} 点护甲。护甲会先挡住伤害。`;
       break;
     case 'buff':
-      body = `自身力量 +${value}，场上随从攻击力各 +${value}。`;
+      body = `自己的力量 +${value}。场上随从立刻加攻，之后上场的也会更壮。`;
       break;
     case 'debuff':
       body = `你场上所有随从的攻击力 -${value}。`;

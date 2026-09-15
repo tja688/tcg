@@ -302,6 +302,16 @@
   color: var(--pack-accent, #f2d089);
 }
 
+.packEyebrow .packTag {
+  border-bottom: 1px dotted color-mix(in srgb, var(--pack-accent, #f2d089) 55%, transparent);
+}
+
+.packEyebrow i {
+  margin: 0 0.35em;
+  font-style: normal;
+  opacity: 0.55;
+}
+
 .packCard h3 {
   margin: 0;
   font-size: 22px;

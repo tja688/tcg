@@ -4,6 +4,8 @@ import { getEvent } from '../run/events.js';
 import { getEncounter } from '../run/encounters.js';
 import { mulberry32 } from '../utils/rng.js';
 import { TYPE_META } from './screens.js';
+import { nodeTipInfo } from './glossary.js';
+import { hideTip, showTip } from './tooltip.js';
 
 const MAP_W = MAP_LAYOUT.w;
 const MAP_H = MAP_LAYOUT.h;
@@ -174,7 +176,7 @@ function buildMapHtml(run, pos, edges) {
     return `<div class="mapPin" style="left:${(p.x / MAP_W) * 100}%;top:${(p.y / MAP_H) * 100}%">
       <button type="button" class="mapNode ${st} t-${n.type}" data-node-id="${id}"
         aria-disabled="${clickable ? 'false' : 'true'}"
-        title="${meta.label} · ${title}">
+        aria-label="${meta.label} · ${title}">
         <span class="nodeCore">
           <span class="ico">${meta.icon}</span>
           ${next.has(id) ? '<i class="pulse"></i>' : ''}
@@ -281,13 +283,18 @@ function bindMap(screens, run, pos, edges, { onNode, onDeck }) {
     btn.onmouseenter = () => {
       const n = getNode(run.map, btn.dataset.nodeId);
       const meta = TYPE_META[n.type];
-      tip.hidden = false;
-      tip.innerHTML = `<b>${meta.label}</b><em>${nodeTitle(n, meta)}</em>`;
-      const pin = btn.closest('.mapPin');
-      tip.style.left = pin?.style.left || btn.style.left;
-      tip.style.top = pin?.style.top || btn.style.top;
+      const title = nodeTitle(n, meta);
+      const enc = n.encounterId ? getEncounter(n.encounterId) : null;
+      const ev = n.eventId ? getEvent(n.eventId) : null;
+      showTip(btn, nodeTipInfo(n.type, title, enc?.blurb || ev?.title || ''), { prefer: 'above', width: 240 });
+      if (tip) {
+        tip.hidden = true;
+      }
     };
-    btn.onmouseleave = () => { tip.hidden = true; };
+    btn.onmouseleave = () => {
+      hideTip(btn);
+      if (tip) tip.hidden = true;
+    };
     btn.onclick = () => {
       if (screens._navLock || panel.classList.contains('is-marching')) return;
       if (btn.getAttribute('aria-disabled') === 'true') {
@@ -313,7 +320,8 @@ function bindMap(screens, run, pos, edges, { onNode, onDeck }) {
       const from = fromId && pos[fromId] ? pos[fromId] : pawnHome(pos, run);
       const ctrl = controlFor(from, dest, edge?.c);
       lockMarch(screens, panel, true);
-      tip.hidden = true;
+      hideTip();
+      if (tip) tip.hidden = true;
       marchPawn(pawn, from, ctrl, dest, () => {
         if (!pawn.isConnected) return;
         onNode(id);

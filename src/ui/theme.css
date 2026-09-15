@@ -237,6 +237,7 @@ body {
 
 .banterItem,
 #enemySkillTip,
+#infoTip,
 #aimHint,
 #toast {
   border-radius: 0;
@@ -255,8 +256,49 @@ body {
 }
 
 .banterItem,
-#enemySkillTip {
+#enemySkillTip,
+#infoTip {
   background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #1a1016 0%, #0c080e 76%);
+}
+
+#infoTip {
+  position: fixed;
+  z-index: 40;
+}
+
+#infoTip .tipTags,
+#enemySkillTip .tipTags {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#infoTip .tipTags li,
+#enemySkillTip .tipTags li {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #d8d0c0;
+}
+
+#infoTip .tipTags em,
+#enemySkillTip .tipTags em {
+  font-style: normal;
+  color: #ffd685;
+  margin-right: 6px;
+}
+
+.tippable,
+.tipTerm,
+.miniRelic,
+.relicChip,
+#runArmor,
+#strHud {
+  cursor: help;
+}
+
+.tipTerm {
+  border-bottom: 1px dotted rgba(242, 208, 137, 0.55);
 }
 
 #llmThink {

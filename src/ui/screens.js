@@ -7,6 +7,8 @@ import { getRelic } from '../run/relics.js';
 import { optionDisabled } from '../run/events.js';
 import { SceneVeil } from './transition.js';
 import { playMapEnter, renderMap } from './mapView.js';
+import { cardTipInfo, linkTerms, packTagsHtml, relicTipInfo } from './glossary.js';
+import { bindTip, bindTipTerms, hideTip } from './tooltip.js';
 import './screens.css';
 import './map.css';
 
@@ -22,7 +24,12 @@ export const TYPE_META = {
   boss: { label: '首领', icon: markIcon('boss') },
 };
 
-function thumb(def, assets, w = 156) {
+function attachCardTip(el, def) {
+  if (!el || !def) return;
+  bindTip(el, () => cardTipInfo(def), { prefer: 'above', width: 268 });
+}
+
+function thumb(def, assets, w = 156, { tip = true } = {}) {
   const c = document.createElement('canvas');
   c.width = CFG.card.texW;
   c.height = CFG.card.texH;
@@ -30,13 +37,24 @@ function thumb(def, assets, w = 156) {
   c.className = 'cardThumb';
   c.style.width = `${w}px`;
   c.alt = def.name;
+  c.tabIndex = tip ? 0 : -1;
+  c.setAttribute('aria-label', def.name);
+  if (tip) attachCardTip(c, def);
   return c;
 }
 
 function relicChip(id) {
   const r = getRelic(id);
   if (!r) return '';
-  return `<span class="relicChip" title="${r.desc}"><b>${r.icon}</b>${r.name}</span>`;
+  return `<span class="relicChip" data-relic="${id}" tabindex="0"><b>${r.icon}</b>${r.name}</span>`;
+}
+
+function bindScreenTips(root) {
+  if (!root) return;
+  bindTipTerms(root);
+  root.querySelectorAll('[data-relic]').forEach((el) => {
+    bindTip(el, () => relicTipInfo(el.dataset.relic), { prefer: 'above' });
+  });
 }
 
 export class Screens {
@@ -60,6 +78,7 @@ export class Screens {
   }
 
   clear() {
+    hideTip();
     this.closeSettings();
     this.closeDeck();
     this.root.classList.remove('active');
@@ -82,6 +101,7 @@ export class Screens {
     } else if (this.veil.covered && meta.title) this.veil.setKind(meta.kind, meta.title);
     this.closeSettings();
     this.closeDeck();
+    hideTip();
     this.root.classList.add('active');
     this.root.innerHTML = html;
     this.playEnter(this.root.querySelector('[data-screen]')?.dataset.screen);
@@ -137,6 +157,7 @@ export class Screens {
   }
 
   closeDeck() {
+    hideTip();
     this.root.querySelectorAll('[data-screen="deck"]').forEach((el) => el.remove());
     this.root.querySelector('.mapPanel')?.classList.remove('deckOpen');
   }
@@ -186,7 +207,7 @@ export class Screens {
           <div class="packGrid">
             ${packs.map((p) => `
               <button class="packCard" type="button" data-pack="${p.id}" data-testid="pack-${p.id}" style="--pack-accent:${p.accent}">
-                <div class="packEyebrow">${p.tag}</div>
+                <div class="packEyebrow">${packTagsHtml(p.tag)}</div>
                 <h3>${p.name}</h3>
                 <p>${p.blurb}</p>
                 <div class="packThumbs" data-pack-thumbs="${p.id}"></div>
@@ -204,6 +225,7 @@ export class Screens {
         if (def) row.appendChild(thumb(def, this.assets, 88));
       }
     }
+    bindScreenTips(this.root);
     return new Promise((resolve) => {
       this.root.querySelectorAll('[data-pack]').forEach((btn) => {
         btn.onclick = async () => {
@@ -356,7 +378,8 @@ export class Screens {
         btn.className = 'cardPick';
         btn.dataset.cardId = id;
         btn.dataset.index = String(i);
-        btn.appendChild(thumb(def, this.assets, 132));
+        btn.appendChild(thumb(def, this.assets, 132, { tip: false }));
+        attachCardTip(btn, def);
         btn.onclick = () => { this.sfx.cue('card.select'); wrap.remove(); resolve(id); };
         row.appendChild(btn);
       });
@@ -389,7 +412,7 @@ export class Screens {
         btn.dataset.opt = opt.id;
         const dead = optionDisabled(run, opt);
         btn.disabled = dead;
-        btn.innerHTML = `<b>${opt.label}</b><small>${dead ? (opt.disabledHint || '无法选择') : opt.hint}</small>`;
+        btn.innerHTML = `<b>${opt.label}</b><small>${linkTerms(dead ? (opt.disabledHint || '无法选择') : opt.hint)}</small>`;
         btn.onclick = async () => {
           if (btn.disabled) {
             this.hud.toast(opt.disabledHint || '无法选择');
@@ -413,6 +436,7 @@ export class Screens {
         };
         col.appendChild(btn);
       });
+      bindTipTerms(col);
     });
   }
 
@@ -457,7 +481,10 @@ export class Screens {
         cell.type = 'button';
         cell.className = `shopCard ${item.sold ? 'sold' : ''}`;
         cell.dataset.shopCard = item.id;
-        if (def) cell.appendChild(thumb(def, this.assets, 150));
+        if (def) {
+          cell.appendChild(thumb(def, this.assets, 150, { tip: false }));
+          attachCardTip(cell, def);
+        }
         const tag = document.createElement('span');
         tag.className = 'priceTag';
         tag.textContent = item.sold ? '已售出' : `${item.price} 金`;
@@ -612,10 +639,12 @@ export class Screens {
         btn.type = 'button';
         btn.className = 'cardPick';
         btn.dataset.rewardCard = id;
-        btn.appendChild(thumb(def, this.assets, 158));
+        btn.appendChild(thumb(def, this.assets, 158, { tip: false }));
+        attachCardTip(btn, def);
         btn.onclick = () => finish(id);
         row.appendChild(btn);
       });
+      bindScreenTips(this.root);
       this.root.querySelector('[data-act="skip"]').onclick = () => finish(null);
     });
   }
@@ -632,6 +661,7 @@ export class Screens {
           <button class="goldBtn" type="button" data-act="take">收下</button>
         </article>
       </div>`, { title: '匣中遗珍', kind: 'treasure' });
+    bindScreenTips(this.root);
     return new Promise((resolve) => {
       this.root.querySelector('[data-act="take"]').onclick = () => {
         this.sfx.cue('ui.confirm');

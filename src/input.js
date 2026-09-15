@@ -300,9 +300,14 @@ export class InputController {
   onMove(e) {
     this.updateNdc(e);
     const d = this.director;
-    if (!this.enabled) { this.setCursor('default'); return; }
+    if (!this.enabled) {
+      this.hud.inspectCard?.(null);
+      this.setCursor('default');
+      return;
+    }
 
     if (this.mode === 'dragMinion' || this.mode === 'dragSpellFree') {
+      this.hud.inspectCard?.(null);
       if (!this.dragArmed && this.movedEnough(e)) this.dragArmed = true;
       const p = this.planePoint(L.dragPlaneY);
       if (p) {
@@ -340,6 +345,7 @@ export class InputController {
     }
 
     if (this.mode === 'spellTarget' || this.mode === 'attack') {
+      this.hud.inspectCard?.(null);
       if (!this.dragArmed && this.movedEnough(e)) this.dragArmed = true;
       const p = this.planePoint(1.0);
       if (p) this.arrow.update(this.arrowFrom.clone(), new THREE.Vector3(p.x, Math.max(p.y, 0.6), p.z));
@@ -379,6 +385,7 @@ export class InputController {
     if (newHover) {
       d.setBoardHover(null);
       this.setCursor('grab');
+      this.hud.inspectCard?.(null);
       return;
     }
 
@@ -387,8 +394,10 @@ export class InputController {
     if (bInst) {
       const canHit = bInst.side === 'player' && bInst.canAttack && bInst.attack > 0 && this.game.turn === 'player';
       this.setCursor(canHit ? 'grab' : 'pointer');
+      this.hud.inspectCard?.(bInst, e);
       return;
     }
+    this.hud.inspectCard?.(null);
     if (!endHit) this.setCursor('default');
   }
 
@@ -399,6 +408,7 @@ export class InputController {
       d.layoutHand();
     }
     d.setBoardHover(null);
+    this.hud.inspectCard?.(null);
   }
 
   // ---------- 按下 ----------
