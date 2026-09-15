@@ -56,6 +56,8 @@ export class Game {
     this.fatigue = { player: 0, enemy: 0 };
     this.phase = 1;
     this.lockedIntent = null;
+    this.playerArchetype = opts.playerArchetype || 'tempo';
+    this.fastAI = !!opts.fastAI;
   }
 
   sideOf(name) { return name === 'player' ? this.player : this.enemy; }
@@ -231,8 +233,7 @@ export class Game {
     s.hand.splice(idx, 1);
 
     if (def.type === 'minion') {
-      inst.attack += s.strength;
-      if (inst.side === 'player' && this.hasRelic('war_banner')) inst.attack += 1;
+      this.applySummonBonuses(inst);
       const at = Math.max(0, Math.min(slot ?? s.board.length, s.board.length));
       s.board.splice(at, 0, inst);
       inst.onBoard = true;
@@ -262,6 +263,26 @@ export class Game {
     return true;
   }
 
+  applySummonBonuses(inst) {
+    const s = this.sideOf(inst.side);
+    inst.attack += s.strength;
+    if (inst.side === 'player' && this.hasRelic('war_banner')) inst.attack += 1;
+  }
+
+  async spawnAlly(sideName, def, { at = null } = {}) {
+    const s = this.sideOf(sideName);
+    if (!def || s.board.length >= CFG.rules.maxBoard) return null;
+    const inst = mkInstance(def, sideName);
+    this.applySummonBonuses(inst);
+    inst.onBoard = true;
+    inst.sick = true;
+    inst.canAttack = false;
+    const idx = Math.max(0, Math.min(at ?? s.board.length, s.board.length));
+    s.board.splice(idx, 0, inst);
+    await this.fx.spawnMinion(inst, idx);
+    return inst;
+  }
+
   async resolveBattlecry(inst, bc) {
     if (bc.type === 'draw') {
       for (let i = 0; i < bc.n; i++) await this.draw(inst.side);
@@ -275,6 +296,39 @@ export class Game {
       const foe = this.sideOf(this.otherName(inst.side)).hero;
       await this.fx.projectile?.('fireball', inst.side, foe);
       this.applyDamage(foe, bc.amount);
+    } else if (bc.type === 'heal_hero') {
+      const hero = this.sideOf(inst.side).hero;
+      await this.fx.healEffect(hero);
+      this.applyHeal(hero, bc.amount);
+    } else if (bc.type === 'armor') {
+      const hero = this.sideOf(inst.side).hero;
+      this.applyArmor(hero, bc.amount);
+    } else if (bc.type === 'summon') {
+      const n = bc.n || 1;
+      const def = CARDS[bc.cardId];
+      const s = this.sideOf(inst.side);
+      const at = s.board.indexOf(inst) + 1;
+      for (let i = 0; i < n; i++) {
+        const pup = await this.spawnAlly(inst.side, def, { at: at + i });
+        if (!pup) break;
+      }
+    }
+  }
+
+  async resolveDeathrattle(inst, dr) {
+    if (dr.type === 'draw') {
+      for (let i = 0; i < (dr.n || 1); i++) await this.draw(inst.side);
+    } else if (dr.type === 'summon') {
+      const n = dr.n || 1;
+      const def = CARDS[dr.cardId];
+      for (let i = 0; i < n; i++) {
+        const pup = await this.spawnAlly(inst.side, def);
+        if (!pup) break;
+      }
+    } else if (dr.type === 'damage_enemy_hero') {
+      const foe = this.sideOf(this.otherName(inst.side)).hero;
+      await this.fx.projectile?.('shadow', inst.side, foe);
+      this.applyDamage(foe, dr.amount);
     }
   }
 
@@ -323,6 +377,31 @@ export class Game {
         hero.armor += sp.amount;
         this.fx.updateArmor?.(hero);
         await this.fx.armorEffect?.(hero, sp.amount);
+        if (sp.healHero) {
+          await this.fx.healEffect(hero);
+          this.applyHeal(hero, sp.healHero);
+        }
+        break;
+      }
+      case 'siphon': {
+        const foe = this.sideOf(this.otherName(inst.side)).hero;
+        const hero = this.sideOf(inst.side).hero;
+        await this.fx.projectile(sp.vfx || 'shadow', inst.side, foe);
+        const amt = inst.side === 'player' ? this.spellDamage(sp.amount) : sp.amount;
+        this.applyDamage(foe, amt);
+        if (sp.heal) {
+          await this.fx.healEffect(hero);
+          this.applyHeal(hero, sp.heal);
+        }
+        break;
+      }
+      case 'summon': {
+        const n = sp.n || 1;
+        const def = CARDS[sp.cardId];
+        for (let i = 0; i < n; i++) {
+          const pup = await this.spawnAlly(inst.side, def);
+          if (!pup) break;
+        }
         break;
       }
     }
@@ -338,6 +417,9 @@ export class Game {
     attacker.canAttack = false;
     await this.fx.attackLunge(attacker, target);
     this.applyDamage(target, attacker.attack);
+    if (hasKeyword(attacker.def, 'lifesteal')) {
+      this.applyHeal(this.sideOf(attacker.side).hero, attacker.attack);
+    }
     if (target.kind === 'hero' && this.hasRelic('thorn_sigil') && target.side === 'player') {
       this.applyDamage(attacker, 1);
     }
@@ -478,21 +560,26 @@ export class Game {
   }
 
   async checkDeaths() {
-    const dead = [
-      ...this.player.board.filter((m) => m.health <= 0),
-      ...this.enemy.board.filter((m) => m.health <= 0),
-    ];
-    if (!dead.length) return;
-    this.player.board = this.player.board.filter((m) => m.health > 0);
-    this.enemy.board = this.enemy.board.filter((m) => m.health > 0);
-    for (const m of dead) {
-      m.onBoard = false;
-      m.dead = true;
-      this.sideOf(m.side).discard.push(m.def);
+    for (let n = 0; n < 8; n++) {
+      const dead = [
+        ...this.player.board.filter((m) => m.health <= 0),
+        ...this.enemy.board.filter((m) => m.health <= 0),
+      ];
+      if (!dead.length) return;
+      this.player.board = this.player.board.filter((m) => m.health > 0);
+      this.enemy.board = this.enemy.board.filter((m) => m.health > 0);
+      for (const m of dead) {
+        m.onBoard = false;
+        m.dead = true;
+        this.sideOf(m.side).discard.push(m.def);
+      }
+      this.fx.updatePiles?.('player');
+      this.fx.updatePiles?.('enemy');
+      await this.fx.deaths(dead);
+      for (const m of dead) {
+        if (m.def.deathrattle) await this.resolveDeathrattle(m, m.def.deathrattle);
+      }
     }
-    this.fx.updatePiles?.('player');
-    this.fx.updatePiles?.('enemy');
-    await this.fx.deaths(dead);
   }
 
   async announceWin() {

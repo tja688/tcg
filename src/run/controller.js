@@ -1,4 +1,5 @@
 import { createRun, grantRelic, snapshotRun } from './state.js';
+import { packArchetype } from './packs.js';
 import { enterNode, completeCurrent, getNode, nodeReachable } from './map.js';
 import { addMaxHp, getEvent, restMaxHpAmount } from './events.js';
 import { getEncounter } from './encounters.js';
@@ -9,6 +10,7 @@ import { Game } from '../game/game.js';
 import { Screens, TYPE_META } from '../ui/screens.js';
 import { mulberry32 } from '../utils/rng.js';
 import { attachPseudoAI, detachPseudoAI } from '../pseudoai/index.js';
+import { resolveArenaEnv } from '../three/environments.js';
 
 function veilFor(node) {
   const meta = TYPE_META[node.type] || { label: '前进' };
@@ -43,15 +45,21 @@ export class RunController {
 
   async boot(autostart = false) {
     this.input.enabled = false;
+    this.director.world.setEnvironment?.(resolveArenaEnv({ kind: 'title' }));
     this.hud.setMode('title');
     this.sfx.bgm.setScene('title');
-    if (!autostart) await this.screens.showTitle();
-    await this.beginRun();
+    if (autostart) {
+      await this.beginRun('ember');
+      return;
+    }
+    await this.screens.showTitle();
+    const packId = await this.screens.showPackPick();
+    await this.beginRun(packId);
   }
 
-  async beginRun() {
+  async beginRun(packId = 'ember') {
     this.rng = mulberry32(this.seed);
-    this.run = createRun(this.rng, this.seed);
+    this.run = createRun(this.rng, this.seed, packId);
     this.hud.refreshRun(this.run);
     await this.showMap();
   }
@@ -62,6 +70,10 @@ export class RunController {
     this.director.teardownCombat();
     this.game = null;
     this.input.game = null;
+    this.director.world.setEnvironment?.(resolveArenaEnv({
+      floor: this.run.floor,
+      kind: 'map',
+    }));
     this.hud.setMode('map');
     this.sfx.bgm.setScene('map');
     this.hud.refreshRun(this.run);
@@ -116,6 +128,10 @@ export class RunController {
     const encounter = getEncounter(encounterId);
     this.run.hp = this.run.maxHp;
     this.hud.setMode('combat');
+    this.director.world.setEnvironment?.(resolveArenaEnv({
+      floor: this.run.floor,
+      kind,
+    }));
     this.sfx.bgm.setScene(kind === 'boss' ? 'boss' : kind === 'elite' ? 'elite' : 'combat');
     this.hud.refreshRun(this.run);
     this.director.teardownCombat();
@@ -125,6 +141,7 @@ export class RunController {
       playerDeckIds: this.run.deck.slice(),
       relics: this.run.relics.slice(),
       encounter,
+      playerArchetype: packArchetype(this.run.packId),
     });
     this.game = game;
     this.director.bindGame(game);
@@ -275,10 +292,12 @@ export class RunController {
     if (next === 'title') {
       this.run = null;
       this.hud.setMode('title');
+      this.director.world.setEnvironment?.(resolveArenaEnv({ kind: 'title' }));
       this.sfx.bgm.setScene('title');
       await this.screens.showTitle();
     }
-    await this.beginRun();
+    const packId = await this.screens.showPackPick();
+    await this.beginRun(packId);
   }
 
   abandon() {
@@ -311,5 +330,49 @@ export class RunController {
       node: run?.currentId,
       pending: run?.pendingNode,
     };
+  }
+
+  _parseStat(n) {
+    const v = Math.floor(Number(n));
+    return Number.isFinite(v) ? v : null;
+  }
+
+  setPlayerHp(n) {
+    const v = this._parseStat(n);
+    if (v === null) return false;
+    const hp = Math.max(0, v);
+    const game = this.game;
+    if (game && !game.over && game.player?.hero) {
+      const h = game.player.hero;
+      if (hp > h.maxHp) h.maxHp = hp;
+      h.hp = hp;
+      if (this.director.heroVis?.[h.side]) this.director.updateHp(h);
+    }
+    if (this.run) {
+      if (hp > this.run.maxHp) this.run.maxHp = hp;
+      this.run.hp = hp;
+      this.hud.refreshRun(this.run);
+    }
+    return !!(this.run || (game && !game.over));
+  }
+
+  setGold(n) {
+    const v = this._parseStat(n);
+    if (v === null || !this.run) return false;
+    this.run.gold = Math.max(0, v);
+    this.hud.refreshRun(this.run);
+    const goldEl = this.screens?.root?.querySelector('[data-gold]');
+    if (goldEl) goldEl.textContent = `${this.run.gold} 金`;
+    return true;
+  }
+
+  winCombat() {
+    const game = this.game;
+    if (!game || game.over) return false;
+    game.enemy.hero.hp = 0;
+    game.checkWin();
+    if (this.director.heroVis?.enemy) this.director.updateHp(game.enemy.hero);
+    this.director.gameOver('player');
+    return true;
   }
 }

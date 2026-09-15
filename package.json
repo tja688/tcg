@@ -15,7 +15,8 @@
     "dist:full": "node scripts/pack-full.mjs",
     "qwen:setup": "node scripts/qwen/setup.mjs",
     "qwen:serve": "node scripts/qwen/serve.mjs",
-    "test": "node scripts/check-run-logic.mjs && node scripts/check-combat-logic.mjs && node scripts/check-banter.mjs && node scripts/check-bgm.mjs && node scripts/check-qwen-pack.mjs"
+    "test": "node scripts/check-run-logic.mjs && node scripts/check-combat-logic.mjs && node scripts/check-banter.mjs && node scripts/check-bgm.mjs && node scripts/check-qwen-pack.mjs",
+    "sim": "node scripts/sim-balance.mjs"
   },
   "dependencies": {
     "gsap": "^3.15.0",

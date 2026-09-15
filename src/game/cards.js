@@ -1,10 +1,11 @@
 import { shuffle } from '../utils/rng.js';
 
-// 卡牌图鉴。加新卡：写 CARDS，登记 art，再放进配方或遭遇牌库。
+// 卡牌图鉴。加新卡：写 CARDS，登记 art，再放进配方、卡包或遭遇牌库。
 // type: minion | spell
-// keywords: taunt | charge
-// battlecry: draw | aoe_enemy | damage_enemy_hero
-// spell.kind: damage | aoe_enemy | heal | draw | buff | debuff | armor
+// keywords: taunt | charge | lifesteal
+// battlecry: draw | aoe_enemy | damage_enemy_hero | heal_hero | armor | summon
+// deathrattle: draw | summon | damage_enemy_hero
+// spell.kind: damage | aoe_enemy | heal | draw | buff | debuff | armor | siphon | summon
 // spell.target: enemy-any | friendly-any | friendly-minion | enemy-minion | none
 export const CARDS = {
   flame_imp: {
@@ -144,6 +145,87 @@ export const CARDS = {
     id: 'burden', name: '负担', type: 'spell', cost: 2, collectible: false,
     rarity: 'common', spell: { kind: 'draw', n: 1, target: 'none', vfx: 'arcane', selfDamage: 3 },
     desc: '抽一张牌，对自己造成 3 点伤害。契约的利息。', art: 'flamestorm', tint: 0x5a4a60,
+  },
+
+  cinder_scout: {
+    id: 'cinder_scout', name: '烬火斥候', type: 'minion', cost: 1, attack: 1, health: 1,
+    rarity: 'common', tribe: '野兽', keywords: ['charge'],
+    desc: '【冲锋】火星未落，它已经咬到脚踝。', art: 'cinder_scout', tint: 0xff8a3a,
+  },
+  pyre_hound: {
+    id: 'pyre_hound', name: '焰冢猎犬', type: 'minion', cost: 2, attack: 3, health: 1,
+    rarity: 'common', tribe: '野兽', battlecry: { type: 'damage_enemy_hero', amount: 1 },
+    desc: '【战吼】对敌方英雄造成 1 点伤害。', art: 'pyre_hound', tint: 0xff6a28,
+  },
+  molten_burst: {
+    id: 'molten_burst', name: '熔火迸裂', type: 'spell', cost: 2,
+    rarity: 'rare', spell: { kind: 'damage', amount: 4, target: 'enemy-minion', vfx: 'fireball' },
+    desc: '对一个敌方随从造成 4 点伤害。', art: 'fireball', tint: 0xff7030,
+  },
+  moss_turtle: {
+    id: 'moss_turtle', name: '青苔盾龟', type: 'minion', cost: 1, attack: 1, health: 3,
+    rarity: 'common', tribe: '野兽', keywords: ['taunt'],
+    desc: '【嘲讽】壳上长满旧神的青苔。', art: 'moss_turtle', tint: 0x6ecf8a,
+  },
+  ward_priest: {
+    id: 'ward_priest', name: '守望牧师', type: 'minion', cost: 2, attack: 1, health: 3,
+    rarity: 'common', tribe: '人类', battlecry: { type: 'heal_hero', amount: 4 },
+    desc: '【战吼】为你的英雄恢复 4 点生命。', art: 'ward_priest', tint: 0xffe08a,
+  },
+  sanctuary: {
+    id: 'sanctuary', name: '圣所', type: 'spell', cost: 3,
+    rarity: 'rare', spell: { kind: 'armor', amount: 4, target: 'none', vfx: 'heal', healHero: 3 },
+    desc: '获得 4 点护甲，并为你的英雄恢复 3 点生命。', art: 'healing_light', tint: 0xffd56a,
+  },
+  rift_sprite: {
+    id: 'rift_sprite', name: '裂隙精灵', type: 'minion', cost: 2, attack: 1, health: 2,
+    rarity: 'rare', tribe: '元素', battlecry: { type: 'draw', n: 1 },
+    desc: '【战吼】抽一张牌。', art: 'arcane_wisdom', tint: 0xb07cff,
+  },
+  echo_mage: {
+    id: 'echo_mage', name: '回声法师', type: 'minion', cost: 3, attack: 2, health: 3,
+    rarity: 'rare', tribe: '人类', deathrattle: { type: 'draw', n: 1 },
+    desc: '【亡语】抽一张牌。', art: 'echo_mage', tint: 0xc86bff,
+  },
+  void_siphon: {
+    id: 'void_siphon', name: '虚空虹吸', type: 'spell', cost: 2,
+    rarity: 'rare', spell: { kind: 'siphon', amount: 3, heal: 2, target: 'none', vfx: 'shadow' },
+    desc: '对敌方英雄造成 3 点伤害，为你的英雄恢复 2 点生命。', art: 'void_siphon', tint: 0x8a4cff,
+  },
+  silver_chaplain: {
+    id: 'silver_chaplain', name: '银辉牧师', type: 'minion', cost: 4, attack: 3, health: 4,
+    rarity: 'rare', tribe: '人类', keywords: ['lifesteal'],
+    desc: '【吸血】造成伤害时，为你的英雄恢复等量生命。', art: 'silver_chaplain', tint: 0xe8f0ff,
+  },
+  meteor_shard: {
+    id: 'meteor_shard', name: '流星碎片', type: 'spell', cost: 5,
+    rarity: 'epic', spell: { kind: 'damage', amount: 7, target: 'enemy-any', vfx: 'fireball' },
+    desc: '对一个敌方角色造成 7 点伤害。', art: 'meteor_shard', tint: 0xff7040,
+  },
+  dawn_paladin: {
+    id: 'dawn_paladin', name: '黎明圣骑', type: 'minion', cost: 5, attack: 4, health: 5,
+    rarity: 'epic', tribe: '人类', keywords: ['taunt'], battlecry: { type: 'armor', amount: 4 },
+    desc: '【嘲讽】【战吼】获得 4 点护甲。', art: 'dawn_paladin', tint: 0xffd166,
+  },
+  twin_shade: {
+    id: 'twin_shade', name: '幽影双子', type: 'minion', cost: 3, attack: 2, health: 2,
+    rarity: 'rare', tribe: '亡灵', battlecry: { type: 'summon', cardId: 'shade_whelp', n: 1 },
+    desc: '【战吼】召唤一个 1/1 的影嗣。', art: 'twin_shade', tint: 0x7a4ab8,
+  },
+  rune_apprentice: {
+    id: 'rune_apprentice', name: '符文学徒', type: 'minion', cost: 1, attack: 1, health: 2,
+    rarity: 'common', tribe: '人类',
+    desc: '墨未干，咒已成。', art: 'frost_elemental', tint: 0x9aa6ff,
+  },
+  grove_archer: {
+    id: 'grove_archer', name: '林荫弓手', type: 'minion', cost: 2, attack: 2, health: 3,
+    rarity: 'common', tribe: '人类',
+    desc: '树影里的第二支箭往往更准。', art: 'forest_wolf', tint: 0x5ad08a,
+  },
+  shade_whelp: {
+    id: 'shade_whelp', name: '影嗣', type: 'minion', cost: 1, attack: 1, health: 1,
+    rarity: 'common', tribe: '亡灵', collectible: false,
+    desc: '孪生影子撕下来的一片。', art: 'shadow_assassin', tint: 0x5a3a80,
   },
 };
 

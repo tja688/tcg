@@ -41,7 +41,7 @@ export function makeAttackIntent(attacker, target) {
 
 export function choosePlay(game, playable) {
   let best = null;
-  let bestScore = 0.5;
+  let bestScore = 0;
   for (const inst of playable) {
     const scored = scorePlay(game, inst);
     if (scored && scored.score > bestScore) {
@@ -49,28 +49,48 @@ export function choosePlay(game, playable) {
       best = scored;
     }
   }
-  return best;
+  if (best) return best;
+  const side = playable[0]?.side;
+  if (side !== 'player') return null;
+  const minion = playable.filter((c) => c.def.type === 'minion').sort((a, b) => a.def.cost - b.def.cost)[0];
+  if (minion) return { inst: minion, slot: game.sideOf(side).board.length, target: null, score: 1 };
+  const spell = playable.find((c) => c.def.type === 'spell');
+  if (!spell) return null;
+  const targets = game.validTargets(spell);
+  return { inst: spell, target: targets[0] || null, score: 1 };
+}
+
+function styleOf(game, side) {
+  return side === 'enemy' ? arch(game) : (game.playerArchetype || 'tempo');
 }
 
 export function scorePlay(game, inst) {
   const d = inst.def;
-  const a = arch(game);
-  const pBoard = game.player.board;
-  const e = game.enemy;
-  const pHero = game.player.hero;
-  const eHero = e.hero;
+  const side = inst.side;
+  const a = styleOf(game, side);
+  const self = game.sideOf(side);
+  const foe = game.sideOf(game.otherName(side));
+  const foeBoard = foe.board;
+  const selfHero = self.hero;
+  const foeHero = foe.hero;
 
   if (d.type === 'minion') {
-    if (e.board.length >= CFG.rules.maxBoard) return null;
+    if (self.board.length >= CFG.rules.maxBoard) return null;
     let score = d.cost * 1.6 + d.attack + d.health * 0.8;
+    if (side === 'player') score += 3;
     if (d.keywords?.includes('taunt')) score += (a.includes('tank') ? 7 : 3);
     if (d.keywords?.includes('charge')) score += (a.includes('aggro') || a === 'tempo' ? d.attack * 2.2 : d.attack);
-    if (d.battlecry?.type === 'aoe_enemy' && pBoard.length >= 2) score += 8;
+    if (d.keywords?.includes('lifesteal')) score += selfHero.hp < 20 ? 5 : 2;
+    if (d.battlecry?.type === 'aoe_enemy' && foeBoard.length >= 2) score += 8;
     if (d.battlecry?.type === 'damage_enemy_hero') score += a.includes('aggro') ? 6 : 3;
+    if (d.battlecry?.type === 'heal_hero') score += selfHero.hp <= selfHero.maxHp - 4 ? 5 : 1;
+    if (d.battlecry?.type === 'armor') score += a.includes('tank') ? 5 : 2;
+    if (d.battlecry?.type === 'summon') score += 4;
+    if (d.battlecry?.type === 'draw' || d.deathrattle?.type === 'draw') score += 2;
     if (a === 'control' && d.cost >= 5) score += 3;
-    if (a === 'buff' && e.strength > 0) score += e.strength * 2;
-    if (eHero.hp < 12 && d.cost >= 5) score -= 2;
-    return { inst, slot: e.board.length, target: null, score };
+    if (a === 'buff' && self.strength > 0) score += self.strength * 2;
+    if (foeHero.hp < 12 && d.cost >= 5) score -= 2;
+    return { inst, slot: self.board.length, target: null, score };
   }
 
   const sp = d.spell;
@@ -81,22 +101,22 @@ export function scorePlay(game, inst) {
     if (!valid.length) return null;
     let target = null;
     let score = 0;
-    if (pHero.hp + (pHero.armor || 0) <= sp.amount && valid.includes(pHero)) {
-      return { inst, target: pHero, score: 200 };
+    if (foeHero.hp + (foeHero.armor || 0) <= sp.amount && valid.includes(foeHero)) {
+      return { inst, target: foeHero, score: 200 };
     }
-    const killable = pBoard.filter((m) => valid.includes(m) && m.health <= sp.amount)
+    const killable = foeBoard.filter((m) => valid.includes(m) && m.health <= sp.amount)
       .sort((x, y) => (y.attack + y.health) - (x.attack + x.health));
     if (killable[0]) {
       target = killable[0];
       score = 10 + target.attack * 1.4 + (target.taunt ? 4 : 0);
     } else {
-      const big = pBoard.filter((m) => valid.includes(m)).sort((x, y) => y.attack - x.attack)[0];
+      const big = foeBoard.filter((m) => valid.includes(m)).sort((x, y) => y.attack - x.attack)[0];
       if (big && (a === 'control' || a === 'status' || big.attack >= 4)) {
         target = big;
         score = 5 + big.attack;
-      } else if (valid.includes(pHero) && (a.includes('aggro') || a === 'boss' || pHero.hp <= 16)) {
-        target = pHero;
-        score = a.includes('aggro') ? 8 : 4;
+      } else if (valid.includes(foeHero) && (a.includes('aggro') || a === 'tempo' || a === 'control' || a === 'boss' || foeHero.hp <= 18)) {
+        target = foeHero;
+        score = (a.includes('aggro') || a === 'tempo') ? 8 : 5;
       }
     }
     if (!target) return null;
@@ -105,18 +125,18 @@ export function scorePlay(game, inst) {
   }
 
   if (sp.kind === 'aoe_enemy') {
-    const value = pBoard.reduce((s, m) => s + Math.min(m.health, sp.amount) + (m.health <= sp.amount ? m.attack : 0), 0);
-    if (pBoard.length >= 2 && value >= 5) return { inst, target: null, score: 7 + value + (a === 'control' ? 4 : 0) };
-    if (pBoard.length >= 3) return { inst, target: null, score: 6 };
+    const value = foeBoard.reduce((s, m) => s + Math.min(m.health, sp.amount) + (m.health <= sp.amount ? m.attack : 0), 0);
+    if (foeBoard.length >= 2 && value >= 5) return { inst, target: null, score: 7 + value + (a === 'control' ? 4 : 0) };
+    if (foeBoard.length >= 3) return { inst, target: null, score: 6 };
     return null;
   }
 
   if (sp.kind === 'heal') {
     const valid = game.validTargets(inst);
-    if (eHero.hp <= eHero.maxHp - 5 && valid.includes(eHero)) {
-      return { inst, target: eHero, score: (a.includes('tank') ? 9 : 5) + (eHero.hp < 12 ? 5 : 0) };
+    if (selfHero.hp <= selfHero.maxHp - 5 && valid.includes(selfHero)) {
+      return { inst, target: selfHero, score: (a.includes('tank') ? 9 : 5) + (selfHero.hp < 12 ? 5 : 0) };
     }
-    const hurt = e.board.filter((m) => valid.includes(m) && m.health <= m.maxHealth - 3)
+    const hurt = self.board.filter((m) => valid.includes(m) && m.health <= m.maxHealth - 3)
       .sort((x, y) => (y.attack) - (x.attack))[0];
     if (hurt) return { inst, target: hurt, score: 4 + (hurt.taunt ? 3 : 0) };
     return null;
@@ -124,8 +144,9 @@ export function scorePlay(game, inst) {
 
   if (sp.kind === 'draw') {
     const pain = sp.selfDamage || 0;
-    if (e.hand.length <= 4) return { inst, target: null, score: 4.5 - pain * 0.4 };
-    if (e.hand.length <= 6 && a === 'control') return { inst, target: null, score: 3 };
+    if (selfHero.hp <= pain) return null;
+    if (self.hand.length <= 4) return { inst, target: null, score: 4.5 - pain * 0.4 };
+    if (self.hand.length <= 6 && a === 'control') return { inst, target: null, score: 3 };
     return null;
   }
 
@@ -144,14 +165,26 @@ export function scorePlay(game, inst) {
   }
 
   if (sp.kind === 'armor') {
-    return { inst, target: null, score: (a.includes('tank') ? 8 : 3) + (eHero.hp < 14 ? 4 : 0) };
+    return { inst, target: null, score: (a.includes('tank') ? 8 : 3) + (selfHero.hp < 14 ? 4 : 0) + (sp.healHero ? 2 : 0) };
+  }
+
+  if (sp.kind === 'siphon') {
+    const face = foeHero.hp + (foeHero.armor || 0);
+    if (face <= sp.amount) return { inst, target: null, score: 200 };
+    let score = 5 + (a.includes('aggro') ? 3 : 0) + (selfHero.hp < 16 ? 3 : 0);
+    return { inst, target: null, score };
+  }
+
+  if (sp.kind === 'summon') {
+    if (self.board.length >= CFG.rules.maxBoard) return null;
+    return { inst, target: null, score: 5 + (sp.n || 1) };
   }
 
   return null;
 }
 
 export function pickAttacker(game, ready) {
-  const a = arch(game);
+  const a = styleOf(game, ready[0]?.side || 'enemy');
   if (a.includes('aggro') || a === 'boss') {
     return [...ready].sort((x, y) => y.attack - x.attack)[0];
   }
@@ -159,12 +192,12 @@ export function pickAttacker(game, ready) {
 }
 
 export function chooseAttackTarget(game, attacker, targets) {
-  const a = arch(game);
+  const a = styleOf(game, attacker.side);
   const minions = targets.filter((t) => t.kind === 'minion');
   const hero = targets.find((t) => t.kind === 'hero');
-  const pHero = game.player.hero;
+  const foeHero = game.sideOf(game.otherName(attacker.side)).hero;
 
-  if (hero && pHero.hp + (pHero.armor || 0) <= attacker.attack) return hero;
+  if (hero && foeHero.hp + (foeHero.armor || 0) <= attacker.attack) return hero;
 
   const canKill = minions.filter((t) => t.health <= attacker.attack);
   const killSafe = canKill.filter((t) => t.attack < attacker.health);
@@ -180,7 +213,7 @@ export function chooseAttackTarget(game, attacker, targets) {
   if (a.includes('tank') || a === 'control') {
     const worthy = canKill.filter((t) => t.attack >= 3);
     if (worthy.length) return worthy[0];
-    if (minions.length && pHero.hp > 18) {
+    if (minions.length && foeHero.hp > 18) {
       const threat = minions.sort((x, y) => y.attack - x.attack)[0];
       if (threat.attack >= 4) return threat;
     }

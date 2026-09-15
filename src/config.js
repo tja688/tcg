@@ -40,10 +40,10 @@ export const CFG = {
   rules: {
     maxBoard: 6, maxHand: 10, maxMana: 10,
     heroHp: 40, startHandPlayer: 4, startHandEnemy: 4,
-    startGold: 80,
-    restMaxHp: 5, restMaxHpChalice: 3,
+    startGold: 90,
+    restMaxHp: 6, restMaxHpChalice: 3,
     shopRemove: 75, shopRefresh: 25,
-    combatGold: [14, 20], eliteGold: [26, 36],
+    combatGold: [18, 24], eliteGold: [28, 38],
   },
 
   colors: {

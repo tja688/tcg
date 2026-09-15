@@ -1,5 +1,6 @@
 import { mulberry32 } from '../src/utils/rng.js';
 import { createRun, grantRelic, STARTER_DECK } from '../src/run/state.js';
+import { PACK_IDS, STARTER_PACKS, assertPacks, buildStarterDeck } from '../src/run/packs.js';
 import { enterNode, completeCurrent, nodeReachable, nextHighlightIds, getNode } from '../src/run/map.js';
 import { addMaxHp, getEvent, EVENT_IDS, restMaxHpAmount } from '../src/run/events.js';
 import { ENCOUNTERS } from '../src/run/encounters.js';
@@ -7,6 +8,7 @@ import { CARDS, collectibleCards } from '../src/game/cards.js';
 import { makeCombatReward, makeTreasureReward, applyGold } from '../src/run/rewards.js';
 import { shopPrice } from '../src/run/relics.js';
 import { generateShop, buyShopCard, buyShopRelic, shopRemoveCard, refreshShopCards } from '../src/run/shop.js';
+import { resolveArenaEnv } from '../src/three/environments.js';
 
 const rng = mulberry32(20260914);
 const run = createRun(rng, 20260914);
@@ -47,17 +49,27 @@ for (const enc of Object.values(ENCOUNTERS)) {
 
 ok(collectibleCards().length >= 16, 'collectible pool');
 ok(run.deck.every((id) => CARDS[id]), 'starter deck valid');
-ok(STARTER_DECK.length === 14, 'starter deck is 14 cards');
-ok(run.hp === 40 && run.maxHp === 40 && run.gold === 80, 'open 40/40 and 80 gold');
+ok(run.deck.length === 14, 'starter deck is 14 cards');
+ok(run.packId === 'ember', 'default pack is ember');
+ok(STARTER_DECK.length === 14, 'legacy STARTER_DECK snapshot is 14');
+assertPacks();
+ok(PACK_IDS.length === 3, 'three starter packs');
+for (const id of PACK_IDS) {
+  const pack = STARTER_PACKS[id];
+  ok(pack.core.length + pack.extraCount === 14, `${id} deals 14`);
+  const built = buildStarterDeck(id, mulberry32(7));
+  ok(built.length === 14 && built.every((cid) => CARDS[cid]), `${id} build valid`);
+}
+ok(run.hp === 40 && run.maxHp === 40 && run.gold === 90, 'open 40/40 and 90 gold');
 ok(run.map.floors.length === 14, 'act1 is 14 floors');
 
 ok(grantRelic(run, 'vital_heart')?.id === 'vital_heart', 'grant vital_heart');
 ok(run.maxHp === 48 && run.hp === 48, 'vital_heart onGain +8/+8');
 ok(grantRelic(run, 'vital_heart') === null, 'duplicate relic rejected');
 
-ok(restMaxHpAmount({ maxHp: 40, relics: [] }) === 5, 'rest +5 max hp');
-ok(restMaxHpAmount({ maxHp: 48, relics: [] }) === 5, 'rest max hp is flat');
-ok(restMaxHpAmount({ maxHp: 40, relics: ['iron_chalice'] }) === 8, 'iron_chalice +3');
+ok(restMaxHpAmount({ maxHp: 40, relics: [] }) === 6, 'rest +6 max hp');
+ok(restMaxHpAmount({ maxHp: 48, relics: [] }) === 6, 'rest max hp is flat');
+ok(restMaxHpAmount({ maxHp: 40, relics: ['iron_chalice'] }) === 9, 'iron_chalice +3');
 {
   const probe = { hp: 22, maxHp: 40 };
   ok(addMaxHp(probe, 6) === 6 && probe.maxHp === 46 && probe.hp === 28, 'addMaxHp raises cap and current');
@@ -67,15 +79,15 @@ ok(shopPrice(75, ['merchant_seal']) === 60, 'merchant_seal 20% off');
 ok(shopPrice(160, ['merchant_seal']) === 128, 'relic slot 160 * 0.8');
 
 const rCombat = makeCombatReward({ relics: [] }, 'combat', mulberry32(1));
-ok(rCombat.gold >= 14 && rCombat.gold <= 20, 'combat gold 14-20');
+ok(rCombat.gold >= 18 && rCombat.gold <= 24, 'combat gold 18-24');
 ok(rCombat.relic === null && rCombat.cards.length === 3, 'combat reward 3 cards no relic');
 const rEvent = makeCombatReward({ relics: [] }, 'event', mulberry32(2));
-ok(rEvent.gold >= 14 && rEvent.gold <= 20 && rEvent.relic === null, 'event combat uses normal gold table');
+ok(rEvent.gold >= 18 && rEvent.gold <= 24 && rEvent.relic === null, 'event combat uses normal gold table');
 const rElite = makeCombatReward({ relics: [] }, 'elite', mulberry32(3));
-ok(rElite.gold >= 26 && rElite.gold <= 36, 'elite gold 26-36');
+ok(rElite.gold >= 28 && rElite.gold <= 38, 'elite gold 28-38');
 ok(!!rElite.relic, 'elite drops a relic');
 const rBoss = makeCombatReward({ relics: [] }, 'boss', mulberry32(4));
-ok(rBoss.gold >= 14 && rBoss.gold <= 20, 'boss gold uses combat table not elite');
+ok(rBoss.gold >= 18 && rBoss.gold <= 24, 'boss gold uses combat table not elite');
 ok(!!rBoss.relic, 'boss reward object still rolls a relic');
 const rCoin = makeCombatReward({ relics: ['ember_coin'] }, 'combat', mulberry32(1));
 ok(rCoin.gold === rCombat.gold + 10, 'ember_coin +10 at generation');
@@ -124,6 +136,14 @@ ok(shopRemoveCard(remRun, shopRem, 'no_such_card').reason === '已经删除过�
 
 applyGold(shopRun, -200);
 ok(shopRun.gold === 0, 'applyGold floors at 0');
+
+ok(resolveArenaEnv({ kind: 'title' }) === 'dusk', 'title env is dusk');
+ok(resolveArenaEnv({ floor: 0, kind: 'combat' }) === 'dusk', 'early combat dusk');
+ok(resolveArenaEnv({ floor: 4, kind: 'combat' }) === 'ashen', 'mid combat ashen');
+ok(resolveArenaEnv({ floor: 7, kind: 'combat' }) === 'void', 'deep combat void');
+ok(resolveArenaEnv({ floor: 11, kind: 'combat' }) === 'threshold', 'late combat threshold');
+ok(resolveArenaEnv({ floor: 5, kind: 'elite' }) === 'void', 'early elite steps up');
+ok(resolveArenaEnv({ floor: 13, kind: 'boss' }) === 'abyss', 'boss is abyss');
 
 if (fails.length) {
   console.error('FAIL\n' + fails.join('\n'));

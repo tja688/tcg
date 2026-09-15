@@ -11,6 +11,7 @@
   --ui-btn-gold: url("/assets/ui/btn_gold.png");
   --ui-btn-ghost: url("/assets/ui/btn_ghost.png");
   --ui-frame-sheet: url("/assets/ui/frame_sheet.png");
+  --ui-frame-window: url("/assets/ui/frame_window.png");
   --ui-frame-choice: url("/assets/ui/frame_choice.png");
   --ui-hud-chip: url("/assets/ui/hud_chip.png");
 }
@@ -302,20 +303,27 @@ body {
   padding: 6px 14px;
 }
 
-/* 面板：frame_sheet 整图底板 */
+/* 窗口：九宫金边 + 自绘绒面，随面板尺寸无损延展 */
 #overlayRoot .sheet,
 .floatLayer .sheet,
 #gameover .inner.sheet,
 .sheet {
+  box-sizing: border-box;
   background-color: #070b18;
-  background-image: var(--ui-frame-sheet);
-  background-size: 100% 100%;
+  background-image: radial-gradient(ellipse 78% 68% at 50% 42%, #121a32 0%, #070b18 76%);
+  background-size: auto;
   background-repeat: no-repeat;
-  background-position: center;
-  border: none;
+  background-clip: padding-box;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 48px 52px;
+  border-image-source: var(--ui-frame-window);
+  border-image-slice: 192;
+  border-image-width: 48px 52px;
+  border-image-repeat: stretch;
   border-radius: 0;
   box-shadow: 0 22px 64px rgba(0, 0, 0, 0.55);
-  padding: clamp(48px, 7vw, 78px) clamp(44px, 6.5vw, 86px) clamp(44px, 6vw, 70px);
+  padding: clamp(16px, 2.2vw, 28px) clamp(18px, 2.6vw, 34px) clamp(18px, 2.4vw, 30px);
 }
 
 .titleInner {
@@ -460,6 +468,8 @@ body {
   .floatLayer .sheet,
   #gameover .inner.sheet,
   .sheet {
-    padding: 40px 28px 36px;
+    border-width: 34px 36px;
+    border-image-width: 34px 36px;
+    padding: 14px 16px 16px;
   }
 }

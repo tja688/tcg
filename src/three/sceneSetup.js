@@ -5,6 +5,20 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CombatGradeShader, ScreenFx } from './screenFx.js';
+import { ARENA_ENVS } from './environments.js';
+
+const BACKDROP_TEX_KEYS = [
+  'backdrop', 'backdrop_dusk', 'backdrop_ashen',
+  'backdrop_void', 'backdrop_threshold', 'backdrop_abyss',
+];
+
+function prepBackdropTex(tex) {
+  if (!tex) return null;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.set(1, 0.62);
+  tex.offset.set(0, 0.16);
+  return tex;
+}
 
 export function createWorld(container, assets) {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -30,7 +44,8 @@ export function createWorld(container, assets) {
   scene.add(rig);
 
   // ---- 灯光 ----
-  scene.add(new THREE.HemisphereLight(0x4a5590, 0x140b18, 0.85));
+  const hemi = new THREE.HemisphereLight(0x4a5590, 0x140b18, 0.85);
+  scene.add(hemi);
 
   const key = new THREE.DirectionalLight(0xffe2b8, 2.3);
   key.position.set(6, 15, 7);
@@ -92,21 +107,22 @@ export function createWorld(container, assets) {
   lane.visible = false;
   scene.add(lane);
 
-  // ---- 远景背景板（贴近竞技场后方，倾斜面向相机，裁取星云带）----
-  if (assets.tex.backdrop) {
-    const bdTex = assets.tex.backdrop;
-    bdTex.wrapS = bdTex.wrapT = THREE.ClampToEdgeWrapping;
-    bdTex.repeat.set(1, 0.62);
-    bdTex.offset.set(0, 0.16);
-    const bd = new THREE.Mesh(
-      new THREE.PlaneGeometry(96, 34),
-      new THREE.MeshBasicMaterial({ map: bdTex, fog: false, depthWrite: false }),
-    );
-    bd.material.color.setRGB(0.85, 0.85, 0.98);
-    bd.position.set(0, 7.5, -24);
-    bd.rotation.x = -0.42;
-    bd.renderOrder = -10;
-    scene.add(bd);
+  // ---- 远景背景板（按阶段换图；帷幕盖住时切换，避免穿帮）----
+  BACKDROP_TEX_KEYS.forEach((key) => prepBackdropTex(assets.tex[key]));
+  let backdropMesh = null;
+  {
+    const startTex = assets.tex.backdrop_dusk || assets.tex.backdrop;
+    if (startTex) {
+      backdropMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(96, 34),
+        new THREE.MeshBasicMaterial({ map: startTex, fog: false, depthWrite: false }),
+      );
+      backdropMesh.material.color.setRGB(0.94, 0.9, 0.84);
+      backdropMesh.position.set(0, 7.5, -24);
+      backdropMesh.rotation.x = -0.42;
+      backdropMesh.renderOrder = -10;
+      scene.add(backdropMesh);
+    }
   }
 
   // ---- 星空 ----
@@ -132,11 +148,11 @@ export function createWorld(container, assets) {
 
   // ---- 漂浮岩石 ----
   const rocks = [];
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x241b36, roughness: 1, metalness: 0 });
   {
-    const mat = new THREE.MeshStandardMaterial({ color: 0x241b36, roughness: 1, metalness: 0 });
     for (let i = 0; i < 10; i++) {
       const size = 0.6 + Math.random() * 1.9;
-      const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), mat);
+      const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(size, 0), rockMat);
       const a = (i / 10) * Math.PI * 2 + Math.random() * 0.5;
       const r = 14 + Math.random() * 11;
       rock.position.set(Math.cos(a) * r, 0.6 + Math.random() * 5.5, Math.sin(a) * r - 4);
@@ -247,10 +263,53 @@ export function createWorld(container, assets) {
   const pointerCur = { x: 0, y: 0 };
   let arenaPulse = 0;
 
+  function setEnvironment(id) {
+    const env = ARENA_ENVS[id] || ARENA_ENVS.dusk;
+    const tex = assets.tex[env.backdrop] || assets.tex.backdrop;
+    if (backdropMesh && tex) {
+      backdropMesh.material.map = tex;
+      backdropMesh.material.color.setRGB(env.bdTint[0], env.bdTint[1], env.bdTint[2]);
+      backdropMesh.material.needsUpdate = true;
+    }
+    scene.background.setHex(env.bg);
+    if (scene.fog) {
+      scene.fog.color.setHex(env.fog);
+      scene.fog.density = env.fogDen;
+    }
+    hemi.color.setHex(env.hemiSky);
+    hemi.groundColor.setHex(env.hemiGround);
+    hemi.intensity = env.hemiInt;
+    key.color.setHex(env.key);
+    key.intensity = env.keyInt;
+    rim.color.setHex(env.rim);
+    rim.intensity = env.rimInt;
+    for (const p of braziers) {
+      p.color.setHex(env.brazier);
+      p.userData.base = env.brazierBase;
+    }
+    if (embers?.material) embers.material.color.setHex(env.ember);
+    for (const f of flames) f.material.color.setHex(env.flame);
+    runeRing.material.color.setHex(env.rune);
+    lane.material.color.setHex(env.rune);
+    rockMat.color.setHex(env.rock);
+    arenaMatSide.color.setHex(env.bg);
+    if (screenFx) {
+      screenFx.base.vignette = env.vignette;
+      screenFx.base.sat = env.sat;
+      screenFx.u.uVignette.value = env.vignette;
+      screenFx.u.uSat.value = env.sat;
+      screenFx.u.uLift.value = env.lift;
+    }
+    if (world) world.envId = env.id;
+    return env.id;
+  }
+
   const world = {
     renderer, scene, camera, composer, bloom, grade, camPos, camTarget, screenFx,
     time: 0,
+    envId: 'dusk',
     _laneOn: false,
+    setEnvironment,
     shake(m, opts) { screenFx.shake(m, opts); },
     pulseArena(s) { arenaPulse = Math.max(arenaPulse, s); },
     setPointer(nx, ny) { pointerTarget.x = nx; pointerTarget.y = ny; },
@@ -327,5 +386,6 @@ export function createWorld(container, assets) {
     render() { composer.render(); },
   };
 
+  setEnvironment('dusk');
   return world;
 }

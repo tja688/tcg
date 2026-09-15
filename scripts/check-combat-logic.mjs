@@ -293,6 +293,84 @@ function handOf(game, id) {
   ok(game.spellDamage(6) === 7, 'spellDamage with lens');
 }
 
+{
+  const game = await startFresh();
+  game.player.hero.hp = 20;
+  const priest = mkInstance(CARDS.ward_priest, 'player');
+  game.player.hand.push(priest);
+  game.player.mana = 10;
+  await game.playCard(priest);
+  ok(game.player.hero.hp === 24, 'ward_priest battlecry heals 4');
+}
+
+{
+  const game = await startFresh();
+  const pal = mkInstance(CARDS.dawn_paladin, 'player');
+  game.player.hand.push(pal);
+  game.player.mana = 10;
+  await game.playCard(pal);
+  ok(game.player.hero.armor === 4 && pal.taunt, 'dawn_paladin armor 4 taunt');
+}
+
+{
+  const game = await startFresh();
+  const twin = mkInstance(CARDS.twin_shade, 'player');
+  game.player.hand.push(twin);
+  game.player.mana = 10;
+  await game.playCard(twin);
+  ok(game.player.board.length === 2, 'twin_shade summons shade');
+  ok(game.player.board.some((m) => m.def.id === 'shade_whelp'), 'shade_whelp token');
+}
+
+{
+  const game = await startFresh();
+  const echo = mkInstance(CARDS.echo_mage, 'player');
+  echo.onBoard = true;
+  echo.health = 0;
+  game.player.board.push(echo);
+  const hand = game.player.hand.length;
+  const deckN = game.player.deck.length;
+  await game.checkDeaths();
+  ok(!game.player.board.includes(echo), 'echo_mage leaves board');
+  ok(game.player.hand.length === hand + 1 || deckN === 0, 'echo_mage deathrattle draws');
+}
+
+{
+  const game = await startFresh();
+  const chap = mkInstance(CARDS.silver_chaplain, 'player');
+  chap.onBoard = true;
+  chap.canAttack = true;
+  chap.sick = false;
+  game.player.board.push(chap);
+  game.player.hero.hp = 20;
+  game.turn = 'player';
+  const taunt = game.enemy.board[0];
+  await game.attack(chap, taunt);
+  ok(game.player.hero.hp === 23, 'lifesteal heals equal to attack');
+}
+
+{
+  const game = await startFresh();
+  game.player.hero.hp = 20;
+  const siphon = mkInstance(CARDS.void_siphon, 'player');
+  game.player.hand.push(siphon);
+  game.player.mana = 10;
+  const foe = game.enemy.hero.hp;
+  await game.playCard(siphon);
+  ok(game.enemy.hero.hp === foe - 3, 'siphon deals 3 to enemy hero');
+  ok(game.player.hero.hp === 22, 'siphon heals 2');
+}
+
+{
+  const game = await startFresh();
+  game.player.hero.hp = 20;
+  const ward = mkInstance(CARDS.sanctuary, 'player');
+  game.player.hand.push(ward);
+  game.player.mana = 10;
+  await game.playCard(ward);
+  ok(game.player.hero.armor === 4 && game.player.hero.hp === 23, 'sanctuary 4 armor + heal 3');
+}
+
 if (fails.length) {
   console.error('FAIL\n' + fails.join('\n'));
   process.exit(1);

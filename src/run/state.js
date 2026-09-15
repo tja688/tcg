@@ -1,28 +1,24 @@
 import { CFG } from '../config.js';
 import { generateAct1 } from './map.js';
 import { getRelic } from './relics.js';
+import { buildStarterDeck, getPack, STARTER_PACKS } from './packs.js';
 
-export const STARTER_DECK = [
-  'flame_imp', 'flame_imp',
-  'void_wisp',
-  'forest_wolf', 'forest_wolf',
-  'stone_bulwark',
-  'crystal_guardian',
-  'holy_shock', 'holy_shock',
-  'lightning_bolt',
-  'healing_light',
-  'frost_shield',
-  'thunder_samurai',
-  'fireball',
-];
+export { STARTER_PACKS };
 
-export function createRun(rng, seed) {
+/** 余烬先锋的一份定稿 14 张，给旧测试和对照用。实际开局走 buildStarterDeck。 */
+export const STARTER_DECK = STARTER_PACKS.ember.core.concat(
+  STARTER_PACKS.ember.pool.slice(0, STARTER_PACKS.ember.extraCount),
+);
+
+export function createRun(rng, seed, packId = 'ember') {
+  const pack = getPack(packId);
   return {
     seed,
+    packId: pack.id,
     hp: CFG.rules.heroHp,
     maxHp: CFG.rules.heroHp,
     gold: CFG.rules.startGold,
-    deck: STARTER_DECK.slice(),
+    deck: buildStarterDeck(pack.id, rng),
     relics: [],
     map: generateAct1(rng),
     currentId: null,
@@ -48,6 +44,7 @@ export function grantRelic(run, id) {
 export function snapshotRun(run) {
   return {
     seed: run.seed,
+    packId: run.packId || null,
     hp: run.hp,
     maxHp: run.maxHp,
     gold: run.gold,

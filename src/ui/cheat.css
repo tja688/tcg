@@ -1,0 +1,153 @@
+#cheatRoot {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 88;
+  pointer-events: none;
+}
+
+#cheatRoot.open {
+  pointer-events: auto;
+}
+
+.cheatPanel {
+  width: min(300px, calc(100vw - 28px));
+  padding: 16px 16px 14px;
+  color: #efe6d0;
+  font-family: var(--font-ui);
+  border-style: solid;
+  border-color: transparent;
+  border-width: 14px 22px;
+  border-image-source: var(--ui-hud-chip);
+  border-image-slice: 200 260;
+  border-image-width: 14px 22px;
+  border-image-repeat: stretch;
+  background-color: #070c18;
+  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #12182c 0%, #070c18 72%);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.cheatHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.cheatEyebrow {
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  color: #8f86a8;
+}
+
+.cheatPanel h3 {
+  margin-top: 2px;
+  font-family: var(--font-serif), var(--font-ui);
+  font-size: 18px;
+  letter-spacing: 0.22em;
+  color: #ffe9b8;
+  text-shadow: 0 0 12px rgba(242, 208, 137, 0.35);
+}
+
+.cheatClose {
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(242, 208, 137, 0.35);
+  background: rgba(8, 12, 24, 0.8);
+  color: #e8dfc8;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cheatClose:hover {
+  color: #fff6dd;
+  border-color: #f2d089;
+}
+
+.cheatStatus {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: #c9b88a;
+  line-height: 1.45;
+}
+
+.cheatRow {
+  display: grid;
+  grid-template-columns: 42px 1fr 44px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cheatRow label {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: #ffe9b8;
+}
+
+.cheatRow input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid rgba(242, 208, 137, 0.38);
+  background: rgba(6, 10, 20, 0.88);
+  color: #fff3d0;
+  font-family: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.cheatRow input:focus,
+.cheatClose:focus-visible,
+.cheatRow button:focus-visible,
+.cheatWin:focus-visible {
+  outline: 1px solid rgba(242, 208, 137, 0.7);
+  outline-offset: 2px;
+}
+
+.cheatRow button,
+.cheatWin {
+  appearance: none;
+  height: 32px;
+  border: 1px solid rgba(242, 208, 137, 0.55);
+  background: radial-gradient(ellipse 80% 70% at 50% 50%, #141e3a 0%, #071018 78%);
+  color: #ffe9b8;
+  font-family: var(--font-serif), var(--font-ui);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+.cheatRow button:hover,
+.cheatWin:hover:not(:disabled) {
+  filter: brightness(1.12);
+  color: #fff6dd;
+}
+
+.cheatWin {
+  width: 100%;
+  height: 38px;
+  margin-top: 6px;
+  letter-spacing: 0.28em;
+  color: #ffedc2;
+}
+
+.cheatWin:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+
+.cheatHint {
+  margin-top: 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #7f74a3;
+}

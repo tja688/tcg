@@ -12,6 +12,7 @@ import { RunController } from './run/controller.js';
 import { grantRelic } from './run/state.js';
 import { getPseudoAI } from './pseudoai/index.js';
 import { snapshotCombat } from './game/snapshot.js';
+import { CheatPanel } from './ui/cheat.js';
 
 const errors = [];
 window.addEventListener('error', (e) => errors.push(String(e.message)));
@@ -40,6 +41,7 @@ async function boot() {
   input.enabled = false;
 
   const run = new RunController({ director, input, hud, sfx, assets, seed });
+  const cheat = new CheatPanel(run);
 
   const resolveT = (sel) => {
     const game = run.game;
@@ -52,7 +54,7 @@ async function boot() {
   };
 
   window.__tcg = {
-    director, world, seed, errors, run, sfx,
+    director, world, seed, errors, run, sfx, cheat,
     get game() { return run.game; },
     state() {
       const game = run.game;
@@ -107,6 +109,7 @@ async function boot() {
       h.hp = n;
       director.updateHp(h);
     },
+    env: (id) => world.setEnvironment(id),
     fx: {
       shake: (m, opts) => world.shake(m, opts),
       punch: (opts) => world.screenFx?.punch(opts),
@@ -119,16 +122,10 @@ async function boot() {
   window.__run = {
     ctrl: run,
     state: () => run.debug(),
-    gold(n) { if (run.run) { run.run.gold = n; hud.refreshRun(run.run); } },
-    hp(n) { if (run.run) { run.run.hp = n; hud.refreshRun(run.run); } },
+    gold(n) { return run.setGold(n); },
+    hp(n) { return run.setPlayerHp(n); },
     relic(id) { if (run.run) { grantRelic(run.run, id); hud.refreshRun(run.run); } },
-    win() {
-      if (run.game && !run.game.over) {
-        run.game.enemy.hero.hp = 0;
-        run.game.checkWin();
-        return director.gameOver('player');
-      }
-    },
+    win() { return run.winCombat(); },
     lose() {
       if (run.game && !run.game.over) {
         run.game.player.hero.hp = 0;

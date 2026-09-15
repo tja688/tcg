@@ -1,6 +1,7 @@
 import { gsap } from 'gsap';
 import { CFG } from '../config.js';
 import { CARDS, getCard } from '../game/cards.js';
+import { STARTER_PACKS } from '../run/packs.js';
 import { paintCardFace } from '../three/cardVisual.js';
 import { getRelic } from '../run/relics.js';
 import { optionDisabled } from '../run/events.js';
@@ -120,8 +121,8 @@ export class Screens {
       playMapEnter(this.root);
       return;
     }
-    if (kind === 'title') {
-      const bits = panel.querySelectorAll('.titleInner > *');
+    if (kind === 'title' || kind === 'pack') {
+      const bits = panel.querySelectorAll('.titleInner > *, .packInner > *');
       if (bits.length) {
         gsap.from(bits, {
           y: 20, opacity: 0, duration: 0.62, stagger: 0.07, ease: 'power3.out', overwrite: 'auto',
@@ -152,7 +153,7 @@ export class Screens {
           <div class="eyebrow">ARCANE DUEL · ACT I</div>
           <h1>暮光回廊</h1>
           <div class="titleRule"></div>
-          <p class="lead">一幕短征程。分支地图、遭遇、商店与篝火，最终对上深渊魔王。</p>
+          <p class="lead">一幕短征程。先选一份初始卡包，再走分支地图、遭遇与商店，最终对上深渊魔王。</p>
           <div class="titleActions">
             <button class="goldBtn cta" data-testid="start-run" type="button">开启远征</button>
             <button class="ghostBtn" data-testid="open-settings" type="button">设置</button>
@@ -164,13 +165,54 @@ export class Screens {
       this.root.querySelector('[data-testid="start-run"]').onclick = async () => {
         this.sfx.cue('ui.start');
         this.sfx.cue('flow.transition');
-        await this.veil.cover({ title: '暮光回廊', kind: 'map' });
+        await this.veil.cover({ title: '选择卡包', kind: 'title' });
         resolve();
       };
       this.root.querySelector('[data-testid="open-settings"]').onclick = () => {
         this.sfx.cue('ui.menu.open');
         this.openSettings();
       };
+    });
+  }
+
+  async showPackPick() {
+    const packs = Object.values(STARTER_PACKS);
+    await this.present(`
+      <div class="panel dim packPanel" data-screen="pack">
+        <div class="packInner">
+          <div class="eyebrow">ARCANE DUEL · ACT I</div>
+          <h1>选择初始卡包</h1>
+          <p class="lead">三套出发方式。核心牌固定，每局再从主题池抽几张，开局不会完全一样。</p>
+          <div class="packGrid">
+            ${packs.map((p) => `
+              <button class="packCard" type="button" data-pack="${p.id}" data-testid="pack-${p.id}" style="--pack-accent:${p.accent}">
+                <div class="packEyebrow">${p.tag}</div>
+                <h3>${p.name}</h3>
+                <p>${p.blurb}</p>
+                <div class="packThumbs" data-pack-thumbs="${p.id}"></div>
+                <small>核心 ${p.core.length} 张 · 主题池再抽 ${p.extraCount} 张</small>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      </div>`, { kind: 'title', title: '选择卡包' });
+    for (const p of packs) {
+      const row = this.root.querySelector(`[data-pack-thumbs="${p.id}"]`);
+      if (!row) continue;
+      for (const id of p.preview) {
+        const def = getCard(id);
+        if (def) row.appendChild(thumb(def, this.assets, 88));
+      }
+    }
+    return new Promise((resolve) => {
+      this.root.querySelectorAll('[data-pack]').forEach((btn) => {
+        btn.onclick = async () => {
+          this.sfx.cue('ui.start');
+          this.sfx.cue('flow.transition');
+          await this.veil.cover({ title: '暮光回廊', kind: 'map' });
+          resolve(btn.dataset.pack);
+        };
+      });
     });
   }
 
