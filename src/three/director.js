@@ -145,6 +145,8 @@ export class Director {
     this.scene.add(this.endTurnBtn.group);
 
     this.heroVis = null; // bindGame 后创建
+    this._projA = new THREE.Vector3();
+    this._projB = new THREE.Vector3();
   }
 
   bindGame(game) {
@@ -158,7 +160,10 @@ export class Director {
     this.scene.add(this.heroVis.player.group, this.heroVis.enemy.group);
     this.heroVis.player.updateMana(0, 0);
     this.heroVis.enemy.updateMana(0, 0);
+    this.heroVis.enemy.setName(enc?.name || game.enemy.hero.name);
+    this.hud?.setPlayerCombat?.(game.player.hero);
     this.syncEnemyHud();
+    this.syncEnemyAnchor();
   }
 
   syncEnemyHud(intent) {
@@ -201,6 +206,8 @@ export class Director {
     this.world.setPlayLane?.(false);
     this.intentBadge.hide();
     this.hud?.setEnemyStatus?.({ name: '', intent: null });
+    this.hud?.anchorEnemy?.(null);
+    this.hud?.anchorPlayerHud?.(null);
     resetThinkHud(this.hud);
     this.hud?.hideEnemyBanter?.();
     this.world.screenFx?.reset();
@@ -403,6 +410,7 @@ export class Director {
     this.updatePiles('player');
     this.updateStrength();
     this.syncEnemyHud();
+    this.hud?.setPlayerCombat?.(g.player.hero);
   }
 
   updateDeck(side) {
@@ -428,6 +436,7 @@ export class Director {
   updateHp(hero) {
     this.heroVis[hero.side].updateHp();
     if (hero.side === 'enemy') this.syncEnemyHud();
+    if (hero.side === 'player') this.hud?.setPlayerCombat?.(hero);
   }
   updateStats(inst) { this.vis.get(inst.uid)?.updateStats(); }
 
@@ -769,10 +778,58 @@ export class Director {
   toast(msg) { this.hud.toast(msg); }
 
   // ---------------- 帧更新 ----------------
+  projectWorld(vec, out = this._projA) {
+    out.copy(vec).project(this.world.camera);
+    return {
+      x: (out.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-out.y * 0.5 + 0.5) * window.innerHeight,
+      z: out.z,
+    };
+  }
+
+  syncEnemyAnchor() {
+    const vis = this.heroVis?.enemy;
+    if (!vis || !this.game) {
+      this.hud?.anchorEnemy?.(null);
+      return;
+    }
+    vis.portrait.getWorldPosition(this._projA);
+    const center = this.projectWorld(this._projA, this._projB);
+    this._projA.x += 1.12;
+    const edge = this.projectWorld(this._projA, this._projB);
+    const radius = Math.max(26, Math.abs(edge.x - center.x));
+    vis.hpSprite.getWorldPosition(this._projA);
+    const hp = this.projectWorld(this._projA, this._projB);
+    this.hud?.anchorEnemy?.({
+      skillX: hp.x - 28,
+      skillY: hp.y,
+      speechX: center.x + radius + 16,
+      speechY: center.y,
+    });
+  }
+
+  syncPlayerHudClearance() {
+    const vis = this.heroVis?.player;
+    if (!vis || !this.game) {
+      this.hud?.anchorPlayerHud?.(null);
+      return;
+    }
+    vis.hpSprite.getWorldPosition(this._projA);
+    const hp = this.projectWorld(this._projA, this._projB);
+    this._projA.x += 0.52;
+    const edge = this.projectWorld(this._projA, this._projB);
+    this.hud?.anchorPlayerHud?.({
+      hpX: hp.x,
+      hpR: Math.max(22, Math.abs(edge.x - hp.x)),
+    });
+  }
+
   update(dt, t) {
     if (this.heroVis) {
       this.heroVis.player.update(t);
       this.heroVis.enemy.update(t);
+      this.syncEnemyAnchor();
+      this.syncPlayerHudClearance();
     }
     this.endTurnBtn.update(t);
     this.dropZone.update(t);

@@ -10,7 +10,7 @@ export const CFG = {
     minionTilt: -0.3,      // 站立卡牌向后仰角
     boardSpacing: 2.22,
     heroPos: { player: [-5.5, 1.12, 4.7], enemy: [0, 1.72, -6.28] },
-    manaAnchor: { player: [3.35, 0.26, 5.8], enemy: [-2.55, 0.26, -5.55] },
+    manaAnchor: { player: [6.55, 0.72, 4.48], enemy: [-6.42, 0.26, -4.52] },
     deckPos: { player: [7.35, 0.06, 4.35], enemy: [-7.35, 0.06, -4.35] },
     endTurnPos: [7.5, 0.16, -0.2],
     revealPos: { player: [0, 3.3, 2.6], enemy: [0, 3.15, -0.2] },

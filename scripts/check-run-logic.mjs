@@ -1,7 +1,7 @@
 import { mulberry32 } from '../src/utils/rng.js';
 import { createRun, grantRelic, STARTER_DECK } from '../src/run/state.js';
 import { PACK_IDS, STARTER_PACKS, assertPacks, buildStarterDeck } from '../src/run/packs.js';
-import { enterNode, completeCurrent, nodeReachable, nextHighlightIds, getNode } from '../src/run/map.js';
+import { enterNode, completeCurrent, nodeReachable, nextHighlightIds, getNode, generateAct1, MAP_LAYOUT } from '../src/run/map.js';
 import { addMaxHp, getEvent, EVENT_IDS, restMaxHpAmount } from '../src/run/events.js';
 import { ENCOUNTERS } from '../src/run/encounters.js';
 import { CARDS, collectibleCards } from '../src/game/cards.js';
@@ -144,6 +144,33 @@ ok(resolveArenaEnv({ floor: 7, kind: 'combat' }) === 'void', 'deep combat void')
 ok(resolveArenaEnv({ floor: 11, kind: 'combat' }) === 'threshold', 'late combat threshold');
 ok(resolveArenaEnv({ floor: 5, kind: 'elite' }) === 'void', 'early elite steps up');
 ok(resolveArenaEnv({ floor: 13, kind: 'boss' }) === 'abyss', 'boss is abyss');
+
+{
+  const m1 = generateAct1(mulberry32(42));
+  const m2 = generateAct1(mulberry32(99));
+  const pts = Object.values(m1.nodes);
+  ok(pts.every((n) => n.x > 40 && n.x < MAP_LAYOUT.w - 40), 'scatter x in bounds');
+  ok(pts.every((n) => n.y > 40 && n.y < MAP_LAYOUT.h - 40), 'scatter y in bounds');
+  const singles = m1.floors.filter((row) => row.length === 1).map((row) => m1.nodes[row[0]].y);
+  ok(Math.max(...singles) - Math.min(...singles) > 70, 'single floors wander in y');
+  let minD = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+      if (d < minD) minD = d;
+    }
+  }
+  ok(minD > 70, 'scattered nodes keep clearance');
+  const a = m1.nodes.f3n0;
+  const b = m2.nodes.f3n0;
+  ok(a.x !== b.x || a.y !== b.y, 'layout varies by seed');
+  const multi = m1.floors.filter((row) => row.length > 1);
+  const staggered = multi.filter((row) => {
+    const xs = row.map((id) => m1.nodes[id].x);
+    return Math.max(...xs) - Math.min(...xs) > 8;
+  }).length;
+  ok(staggered >= Math.ceil(multi.length * 0.5), 'same-floor nodes stagger in x');
+}
 
 if (fails.length) {
   console.error('FAIL\n' + fails.join('\n'));

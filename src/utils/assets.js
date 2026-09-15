@@ -47,6 +47,12 @@ const IMAGE_LIST = {
   mark_treasure: '/assets/ui/mark_treasure.png',
   mark_boss: '/assets/ui/mark_boss.png',
   pawn_player: '/assets/ui/pawn_player.png',
+  skill_attack: '/assets/ui/skill_attack.png',
+  skill_defend: '/assets/ui/skill_defend.png',
+  skill_buff: '/assets/ui/skill_buff.png',
+  skill_debuff: '/assets/ui/skill_debuff.png',
+  skill_summon: '/assets/ui/skill_summon.png',
+  skill_special: '/assets/ui/skill_special.png',
 };
 
 export function imageSrc(key, fallback = 'hero_warlock') {

@@ -68,16 +68,12 @@ export class HeroVisual {
     }));
     this.hpSprite.scale.set(1.05, 1.05, 1);
     if (side === 'player') this.hpSprite.position.set(-1.55, 0.3, 0.25);
-    else {
-      // 敌方面上血量会被手牌挡住，改由左侧 2D HUD 显示
-      this.hpSprite.position.set(-1.62, 0.18, 0.28);
-      this.hpSprite.visible = false;
-    }
+    else this.hpSprite.position.set(-1.62, 0.18, 0.28);
     this.group.add(this.hpSprite);
     this.paintHp();
 
-    // ---- 法力水晶 ----
     // ---- 法力水晶（世界坐标锚点，独立于头像位置）----
+    const player = side === 'player';
     this.gems = [];
     this.manaGroup = new THREE.Group();
     const anchor = CFG.layout.manaAnchor[side];
@@ -87,35 +83,54 @@ export class HeroVisual {
       anchor[2] - this.group.position.z,
     );
     this.group.add(this.manaGroup);
-    const dir = side === 'player' ? 1 : -1;
-    const gemGeo = new THREE.OctahedronGeometry(0.13);
+    this.manaGroup.visible = player;
+    const dir = player ? -1 : 1;
+    const gemGap = player ? 0.46 : 0.27;
+    const gemGeo = new THREE.OctahedronGeometry(player ? 0.24 : 0.13);
+    const gemScale = player ? 1.5 : 1.12;
+    if (player && assets.glowTex) {
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: assets.glowTex, color: 0x39c9ff, transparent: true,
+        opacity: 0.38, depthWrite: false,
+      }));
+      glow.scale.set(3.6, 1.15, 1);
+      glow.position.set(-1.15, 0.08, 0.02);
+      this.manaGroup.add(glow);
+    }
     for (let i = 0; i < CFG.rules.maxMana; i++) {
       const m = new THREE.Mesh(gemGeo, new THREE.MeshBasicMaterial({
         color: 0x39c9ff, transparent: true, opacity: 0.95,
       }));
-      m.position.set(dir * i * 0.27, 0, 0);
-      m.scale.setScalar(1.12);
+      m.position.set(dir * i * gemGap, 0, 0);
+      m.scale.setScalar(gemScale);
       m.visible = false;
       m.userData.phase = i * 0.55;
       this.manaGroup.add(m);
       this.gems.push(m);
     }
     this._manaDir = dir;
+    this._manaGap = gemGap;
+    this._gemScale = gemScale;
     this.manaText = new TextSprite({
-      text: '0/0', font: '700 64px Georgia, "Microsoft YaHei"', color: '#8fdcff',
-      canvasW: 256, canvasH: 128, worldH: 0.42, strokeWidth: 8,
+      text: '0/0',
+      font: player ? '800 88px Georgia, "Microsoft YaHei"' : '700 64px Georgia, "Microsoft YaHei"',
+      color: '#9ae7ff',
+      canvasW: player ? 360 : 256,
+      canvasH: player ? 160 : 128,
+      worldH: player ? 0.86 : 0.42,
+      strokeWidth: player ? 10 : 8,
     });
-    this.manaText.sprite.position.set(dir * 0.6, 0.02, 0);
+    this.manaText.sprite.position.set(dir * 0.6, player ? 0.08 : 0.02, 0);
     this.manaGroup.add(this.manaText.sprite);
 
-    // 名字
+    // 名字：玩家改由平面 HUD 显示，敌人放在场地头像下方
     this.nameText = new TextSprite({
-      text: hero.name, font: '600 44px "Microsoft YaHei"', color: side === 'player' ? '#e8d9ae' : '#f0a89a',
-      canvasW: 512, canvasH: 96, worldH: 0.3, strokeWidth: 6,
+      text: hero.name, font: '700 48px "Microsoft YaHei"', color: side === 'player' ? '#e8d9ae' : '#f0a89a',
+      canvasW: 512, canvasH: 96, worldH: 0.36, strokeWidth: 6,
     });
-    this.nameText.sprite.position.set(0, side === 'player' ? -1.5 : 2.42, side === 'player' ? 0.5 : 0.15);
-    this.nameText.material.opacity = side === 'player' ? 0.9 : 0;
-    this.nameText.sprite.visible = side === 'player';
+    this.nameText.sprite.position.set(0, -1.5, side === 'player' ? 0.5 : 0.22);
+    this.nameText.material.opacity = side === 'enemy' ? 0.94 : 0;
+    this.nameText.sprite.visible = side === 'enemy';
     this.group.add(this.nameText.sprite);
   }
 
@@ -151,8 +166,8 @@ export class HeroVisual {
   flashMana() {
     for (const gem of this.gems) {
       if (!gem.visible) continue;
-      gsap.fromTo(gem.scale, { x: 1.45, y: 1.45, z: 1.45 }, {
-        x: 1.12, y: 1.12, z: 1.12, duration: 0.35, ease: 'back.out(2)', overwrite: 'auto',
+      gsap.fromTo(gem.scale, { x: this._gemScale + 0.33, y: this._gemScale + 0.33, z: this._gemScale + 0.33 }, {
+        x: this._gemScale, y: this._gemScale, z: this._gemScale, duration: 0.35, ease: 'back.out(2)', overwrite: 'auto',
       });
       gsap.fromTo(gem.material.color, { r: 1, g: 0.25, b: 0.2 }, {
         r: 0.22, g: 0.79, b: 1, duration: 0.45, overwrite: 'auto',
@@ -252,15 +267,15 @@ export class HeroVisual {
       if (i < mana) {
         gem.material.color.setHex(0x39c9ff);
         gem.material.opacity = 0.95;
-        gem.scale.setScalar(1.12);
+        gem.scale.setScalar(this._gemScale);
       } else {
         gem.material.color.setHex(0x14384f);
         gem.material.opacity = 0.55;
-        gem.scale.setScalar(0.8);
+        gem.scale.setScalar(this._gemScale * 0.72);
       }
     }
     // 数字紧跟在水晶行末尾
-    this.manaText.sprite.position.x = this._manaDir * (Math.max(manaMax - 1, 0) * 0.27 + 0.62);
+    this.manaText.sprite.position.x = this._manaDir * (Math.max(manaMax - 1, 0) * this._manaGap + (this.side === 'player' ? 0.86 : 0.62));
     this.manaText.setText(`${mana}/${manaMax}`);
   }
 

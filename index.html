@@ -126,19 +126,46 @@
     }
     #loading .tip { margin-top: 18px; font-size: 12px; letter-spacing: 4px; color: #665d86; }
 
-    /* ======= 英雄旁远征信息（左下）======= */
-    #runStrip {
-      position: absolute; left: 16px; bottom: 22px; top: auto;
-      display: none; gap: 8px; align-items: flex-end; flex-wrap: wrap;
-      pointer-events: auto; z-index: 26; max-width: 320px;
+    /* ======= 玩家远征 HUD ======= */
+    #playerHud {
+      position: absolute; top: auto; left: 10px; bottom: 10px;
+      width: min(248px, 32vw);
+      display: none;
+      pointer-events: auto;
+      z-index: 26;
     }
-    #runStrip.show { display: flex; }
-    .stat {
-      min-width: 0; padding: 8px 16px; font-size: 13px; letter-spacing: 1px;
-      color: #efe6d0;
+    body[data-mode="combat"] #playerHud {
+      width: min(220px, 24vw);
     }
-    .stat b { color: var(--gold); font-weight: 700; }
-    #runRelics { display: flex; gap: 6px; flex-wrap: wrap; max-width: 220px; }
+    #playerHud.show { display: block; }
+    .playerHudBox {
+      padding: 4px 8px 6px;
+    }
+    .playerHudName {
+      font-size: 14px; font-weight: 800; letter-spacing: 0.22em;
+      color: #ffe9b8; padding-bottom: 4px; margin-bottom: 6px;
+      border-bottom: 1px solid rgba(242, 208, 137, 0.28);
+      text-shadow: 0 0 12px rgba(242, 208, 137, 0.28);
+    }
+    .playerHudGrid { display: grid; gap: 5px; }
+    .playerHudRow {
+      display: grid; grid-template-columns: 42px 1fr auto;
+      align-items: baseline; gap: 8px;
+      font-size: 13px; letter-spacing: 0.08em; color: #efe6d0;
+    }
+    .playerHudRow .lab, .playerHudRelics .lab {
+      color: #9aa3c8; letter-spacing: 0.16em; font-size: 11px;
+    }
+    .playerHudRow b { color: var(--gold); font-weight: 700; }
+    #runArmor {
+      padding: 0 7px; font-size: 11px; letter-spacing: 1px; color: #dce8ff;
+      background: rgba(36, 50, 74, 0.85);
+      box-shadow: inset 0 0 0 1px rgba(180, 210, 255, 0.45);
+    }
+    #playerHud.low #runHp { color: #ff8a72; }
+    .playerHudRelics { margin-top: 6px; }
+    .playerHudRelics .lab { display: block; margin-bottom: 5px; }
+    #runRelics { display: flex; gap: 6px; flex-wrap: wrap; }
     .miniRelic, .muted {
       padding: 5px 14px; font-size: 11px;
       color: #c9b88a;
@@ -147,99 +174,10 @@
 
     #strHud {
       position: absolute; pointer-events: none;
-      font-size: 12px; letter-spacing: 1px; color: #c9bfd8;
+      left: 20px; top: auto; bottom: 22%;
+      font-size: 12px; letter-spacing: 1px; color: #ffd166;
       text-shadow: 0 2px 8px rgba(0,0,0,0.7);
     }
-    #enemyHud {
-      position: absolute;
-      top: 12px;
-      left: 16px;
-      width: min(312px, 34vw);
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 8px;
-      opacity: 0;
-      pointer-events: none;
-      transform: none;
-      white-space: normal;
-      transition: opacity 0.25s;
-      z-index: 25;
-    }
-    #enemyHud.show { opacity: 1; }
-    body[data-mode="combat"] #runStrip .dockHp { display: none; }
-    .enemyPlate {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 14px 8px 10px;
-      color: #efe6d0;
-    }
-    .enemyPortrait {
-      width: 72px;
-      height: 72px;
-      flex-shrink: 0;
-      border-radius: 50%;
-      overflow: hidden;
-      box-shadow:
-        0 0 0 2px rgba(242, 208, 137, 0.78),
-        0 0 0 5px rgba(70, 16, 14, 0.92),
-        0 8px 18px rgba(0, 0, 0, 0.5);
-      background: #1a0c10;
-    }
-    .enemyPortrait img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .enemyMeta { flex: 1; min-width: 0; }
-    #enemyHudName {
-      color: #ffb09f;
-      letter-spacing: 2px;
-      font-size: 14px;
-      line-height: 1.3;
-    }
-    .enemyHpRow {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 6px;
-    }
-    .enemyHpTrack {
-      flex: 1;
-      height: 13px;
-      overflow: hidden;
-      background: rgba(18, 6, 8, 0.88);
-      box-shadow: inset 0 0 0 1px rgba(242, 208, 137, 0.42);
-    }
-    #enemyHudHpFill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(180deg, #ff8a72 0%, #c33520 52%, #6a140c 100%);
-      box-shadow: 0 0 10px rgba(255, 70, 40, 0.4);
-      transition: width 0.35s ease;
-    }
-    #enemyHud.low #enemyHudHpFill {
-      background: linear-gradient(180deg, #ffd0c0 0%, #e03a20 52%, #5e0d02 100%);
-    }
-    #enemyHudHp { color: #ffe9b8; font-weight: 700; font-size: 12px; letter-spacing: 0.5px; white-space: nowrap; }
-    #enemyHudArmor {
-      padding: 1px 7px;
-      font-size: 11px;
-      letter-spacing: 1px;
-      color: #dce8ff;
-      background: rgba(36, 50, 74, 0.85);
-      box-shadow: inset 0 0 0 1px rgba(180, 210, 255, 0.45);
-    }
-    #enemyHudIntent {
-      margin-top: 5px;
-      color: #ffc4b8;
-      font-size: 11px;
-      letter-spacing: 1px;
-      line-height: 1.35;
-    }
-    #strHud { left: 20px; top: auto; bottom: 22%; color: #ffd166; }
     #aimHint {
       position: absolute; left: 50%; bottom: 20%; transform: translateX(-50%);
       padding: 10px 28px; font-size: 14px; letter-spacing: 2px;
@@ -248,6 +186,50 @@
     }
     #aimHint.show { opacity: 1; }
 
+    /* ======= 敌人场地锚点 HUD ======= */
+    #enemyStage {
+      position: absolute; inset: 0;
+      opacity: 0; pointer-events: none;
+      z-index: 25; transition: opacity 0.2s;
+    }
+    #enemyStage.show { opacity: 1; }
+    #enemySkills {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center;
+      transform: translate(-100%, -50%);
+      pointer-events: auto;
+    }
+    .enemySkill {
+      appearance: none; -webkit-appearance: none;
+      position: relative; width: 62px; height: 62px; padding: 0;
+      border: 0; border-radius: 50%; overflow: visible;
+      background: #14080a; cursor: default;
+      box-shadow:
+        0 0 0 2px rgba(242, 208, 137, 0.88),
+        0 0 0 5px rgba(48, 12, 10, 0.92),
+        0 0 18px rgba(255, 90, 40, 0.35);
+    }
+    .enemySkill img {
+      width: 62px; height: 62px; border-radius: 50%;
+      object-fit: cover; display: block;
+    }
+    .enemySkill .skillVal {
+      position: absolute; right: -4px; bottom: -4px;
+      min-width: 22px; height: 22px; padding: 0 5px;
+      border-radius: 11px;
+      display: grid; place-items: center;
+      font-size: 12px; font-weight: 800; color: #fff6dd;
+      background: #6a140c;
+      box-shadow: 0 0 0 2px rgba(242, 208, 137, 0.75);
+    }
+    #enemySpeech {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+      gap: 6px;
+      width: min(320px, 36vw); max-width: min(320px, 36vw);
+      transform: translate(0, -42%);
+      pointer-events: none;
+    }
     #llmThink {
       position: relative; top: auto; left: auto; transform: none;
       font-size: 11px; letter-spacing: 1.2px; color: #9aa0c0;
@@ -269,46 +251,63 @@
       0%, 100% { opacity: 0.7; }
       50% { opacity: 0.96; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      #llmThink.show { animation: none; opacity: 0.92; }
+    #enemyBanterStack {
+      display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+      gap: 6px; width: 100%;
     }
-
-    #enemyBanter {
+    .banterItem {
       position: relative;
-      left: auto;
-      top: auto;
-      transform: translateY(6px);
-      width: 100%;
-      max-width: none;
-      padding: 0 16px;
-      max-height: 0;
-      border-radius: 0;
+      width: fit-content; max-width: 100%;
+      padding: 8px 14px 10px;
       font-size: 13.5px; line-height: 1.65; letter-spacing: 0.02em;
       color: #f3e6d0;
-      opacity: 0; pointer-events: none;
-      transition: opacity 0.22s, transform 0.22s, max-height 0.22s, padding 0.22s;
-      overflow: hidden;
-      white-space: normal;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      background: rgba(14, 8, 12, 0.9);
+      box-shadow:
+        0 0 0 1px rgba(242, 208, 137, 0.42),
+        0 8px 20px rgba(0, 0, 0, 0.45);
+      transform-origin: left center;
+      animation: banterIn 0.2s cubic-bezier(.2,.85,.3,1) both;
     }
-    #enemyBanter.show {
-      opacity: 1;
-      transform: translateY(0);
-      max-height: 220px;
-      padding: 10px 16px 12px;
-      overflow: visible;
+    .banterItem.out { animation: banterOut 0.4s ease forwards; }
+    .banterItem:last-child::before {
+      content: "";
+      position: absolute;
+      left: -8px; top: 16px;
+      border: 7px solid transparent;
+      border-right-color: rgba(242, 208, 137, 0.5);
     }
-    #enemyBanterWho {
-      display: block; font-size: 10px; letter-spacing: 3px;
-      color: #ffb09f; margin-bottom: 4px;
+    .banterText {
+      display: block; white-space: normal;
+      word-break: break-word; overflow-wrap: anywhere;
     }
-    #enemyBanterText {
-      display: block;
-      white-space: normal;
-      overflow: visible;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+    @keyframes banterIn {
+      0% { opacity: 0; transform: translateX(10px) scale(0.94); }
+      100% { opacity: 1; transform: translateX(0) scale(1); }
+    }
+    @keyframes banterOut {
+      0% { opacity: 1; transform: translateY(0); }
+      100% { opacity: 0; transform: translateY(-14px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #llmThink.show { animation: none; opacity: 0.92; }
+      .banterItem, .banterItem.out { animation: none; }
+    }
+    #enemySkillTip {
+      position: absolute; z-index: 27; pointer-events: none;
+      width: 220px; padding: 10px 14px 12px;
+      color: #efe6d0;
+    }
+    #enemySkillTip[hidden] { display: none !important; }
+    #enemySkillTip b {
+      display: block; color: #ffe9b8; letter-spacing: 0.16em;
+      font-size: 13px; margin-bottom: 4px;
+    }
+    #enemySkillTip p {
+      margin: 0; font-size: 12.5px; line-height: 1.55; color: #f3e6d0;
+    }
+    #enemySkillTip small {
+      display: block; margin-top: 6px; color: #ffb09f;
+      letter-spacing: 0.08em; font-size: 11px;
     }
 
     /* ======= 覆盖层 ======= */
@@ -420,12 +419,8 @@
     @media (max-width: 900px) {
       .shopGrid { grid-template-columns: 1fr; }
       .titleInner h1 { font-size: 40px; letter-spacing: 8px; }
-      #enemyHud {
-        top: 12px;
-        left: 10px;
-        width: min(280px, 46vw);
-      }
-      .enemyPortrait { width: 58px; height: 58px; }
+      #playerHud { width: min(220px, 46vw); }
+      .enemySkill, .enemySkill img { width: 52px; height: 52px; }
     }
   </style>
   <link rel="stylesheet" href="/src/ui/theme.css">
@@ -439,34 +434,37 @@
       <button class="iconBtn" id="deckBtn" type="button" data-testid="open-deck"><span class="btnLabel">牌库</span></button>
       <button class="iconBtn" id="settingsBtn" type="button"><span class="btnLabel">设置</span></button>
     </div>
-    <div id="runStrip">
-      <div class="stat dockMain">
-        <span class="dockHp">生命 <b id="runHp">40/40</b></span>
-        <span class="dockGold">金币 <b id="runGold">80</b></span>
-        <span id="runFloor">第 1 层</span>
-      </div>
-      <div id="runRelics"><span class="muted">无遗物</span></div>
-    </div>
-    <div id="enemyHud">
-      <div id="llmThink"></div>
-      <div class="enemyPlate">
-        <div class="enemyPortrait">
-          <img id="enemyHudPortrait" alt="">
-        </div>
-        <div class="enemyMeta">
-          <div id="enemyHudName"></div>
-          <div class="enemyHpRow">
-            <div class="enemyHpTrack"><div id="enemyHudHpFill"></div></div>
-            <span id="enemyHudHp"></span>
-            <span id="enemyHudArmor" hidden></span>
+    <div id="playerHud">
+      <div class="playerHudBox">
+        <div class="playerHudName" id="runName">晨曦法师</div>
+        <div class="playerHudGrid">
+          <div class="playerHudRow">
+            <span class="lab">生命</span>
+            <b id="runHp">40/40</b>
+            <span id="runArmor" hidden></span>
           </div>
-          <div id="enemyHudIntent"></div>
+          <div class="playerHudRow">
+            <span class="lab">金币</span>
+            <b id="runGold">80</b>
+          </div>
+          <div class="playerHudRow">
+            <span class="lab">楼层</span>
+            <span id="runFloor">第 1 层</span>
+          </div>
+        </div>
+        <div class="playerHudRelics">
+          <span class="lab">遗物</span>
+          <div id="runRelics"><span class="muted">无遗物</span></div>
         </div>
       </div>
-      <div id="enemyBanter">
-        <span id="enemyBanterWho"></span>
-        <span id="enemyBanterText"></span>
+    </div>
+    <div id="enemyStage">
+      <div id="enemySkills"></div>
+      <div id="enemySpeech">
+        <div id="llmThink"></div>
+        <div id="enemyBanterStack"></div>
       </div>
+      <div id="enemySkillTip" hidden></div>
     </div>
     <div id="strHud"></div>
     <div id="aimHint"></div>

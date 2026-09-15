@@ -6,6 +6,13 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CombatGradeShader, ScreenFx } from './screenFx.js';
 import { ARENA_ENVS } from './environments.js';
+import {
+  addBackdropFadeY,
+  bindBackdropAbyssFade,
+  tintBackdropAbyss,
+  tickBackdropAbyss,
+  createAbyssLayer,
+} from './abyss.js';
 
 const BACKDROP_TEX_KEYS = [
   'backdrop', 'backdrop_dusk', 'backdrop_ashen',
@@ -114,13 +121,14 @@ export function createWorld(container, assets) {
     const startTex = assets.tex.backdrop_dusk || assets.tex.backdrop;
     if (startTex) {
       backdropMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(96, 34),
+        addBackdropFadeY(new THREE.PlaneGeometry(96, 34)),
         new THREE.MeshBasicMaterial({ map: startTex, fog: false, depthWrite: false }),
       );
       backdropMesh.material.color.setRGB(0.94, 0.9, 0.84);
-      backdropMesh.position.set(0, 7.5, -24);
-      backdropMesh.rotation.x = -0.42;
+      backdropMesh.position.set(0, 3.4, -17.2);
+      backdropMesh.rotation.x = -0.2;
       backdropMesh.renderOrder = -10;
+      bindBackdropAbyssFade(backdropMesh, ARENA_ENVS.dusk);
       scene.add(backdropMesh);
     }
   }
@@ -190,6 +198,8 @@ export function createWorld(container, assets) {
     embers.userData.vel = vel;
     scene.add(embers);
   }
+
+  const abyss = createAbyssLayer(scene, assets);
 
   // ---- 篝火火焰粒子（两座）----
   const flames = [];
@@ -272,6 +282,8 @@ export function createWorld(container, assets) {
       backdropMesh.material.needsUpdate = true;
     }
     scene.background.setHex(env.bg);
+    tintBackdropAbyss(backdropMesh, env);
+    abyss.applyEnv(env);
     if (scene.fog) {
       scene.fog.color.setHex(env.fog);
       scene.fog.density = env.fogDen;
@@ -322,6 +334,8 @@ export function createWorld(container, assets) {
       world.time += dt;
       const t = world.time;
       screenFx.update(dt);
+      tickBackdropAbyss(backdropMesh, t);
+      abyss.update(dt, t);
 
       pointerCur.x += (pointerTarget.x - pointerCur.x) * Math.min(1, dt * 3.2);
       pointerCur.y += (pointerTarget.y - pointerCur.y) * Math.min(1, dt * 3.2);

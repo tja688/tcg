@@ -1,11 +1,12 @@
 import { gsap } from 'gsap';
-import { getNode, nodeVisualState, nextHighlightIds } from '../run/map.js';
+import { getNode, nodeVisualState, nextHighlightIds, scatterNodePositions, MAP_LAYOUT } from '../run/map.js';
 import { getEvent } from '../run/events.js';
 import { getEncounter } from '../run/encounters.js';
+import { mulberry32 } from '../utils/rng.js';
 import { TYPE_META } from './screens.js';
 
-const MAP_W = 1200;
-const MAP_H = 580;
+const MAP_W = MAP_LAYOUT.w;
+const MAP_H = MAP_LAYOUT.h;
 const PAWN_SRC = '/assets/ui/pawn_player.png';
 
 function reduceMotion() {
@@ -26,17 +27,38 @@ function pathKind(run, fromId, toId) {
   return 'idle';
 }
 
-function curveOf(a, b, i) {
-  const lift = (i % 2 ? -1 : 1) * 22;
+function edgeNoise(key) {
+  let h = 2166136261;
+  const s = String(key);
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967296;
+}
+
+function curveOf(a, b, key) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const rnd = edgeNoise(key);
+  const sign = rnd < 0.5 ? -1 : 1;
+  const mag = Math.min(58, 8 + len * 0.15) * (0.55 + rnd * 0.8);
+  const along = 0.38 + rnd * 0.22;
   return {
     a,
     b,
-    c: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + lift },
+    c: {
+      x: a.x + dx * along + nx * mag * sign,
+      y: a.y + dy * along + ny * mag * sign,
+    },
   };
 }
 
-function quadPath(a, b, i) {
-  const { c } = curveOf(a, b, i);
+function quadPath(a, b, key) {
+  const { c } = curveOf(a, b, key);
   return `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${c.x.toFixed(1)},${c.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
 }
 
@@ -48,20 +70,26 @@ function bezier2(p0, p1, p2, t) {
   };
 }
 
+function hashSeed(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
 function layoutNodes(map) {
+  const missing = Object.values(map.nodes).some((n) => n.x == null || n.y == null);
+  if (missing) {
+    const seed = hashSeed(Object.keys(map.nodes).sort().join(','));
+    scatterNodePositions(map, mulberry32(seed));
+  }
   const pos = {};
-  const padX = 72;
-  const padY = 48;
-  map.floors.forEach((row, f) => {
-    const x = padX + (f / Math.max(1, map.floors.length - 1)) * (MAP_W - padX * 2);
-    const n = row.length;
-    row.forEach((id, i) => {
-      const y = n === 1
-        ? MAP_H * 0.5
-        : padY + (i / (n - 1)) * (MAP_H - padY * 2);
-      pos[id] = { x, y };
-    });
-  });
+  for (const id of Object.keys(map.nodes)) {
+    const n = map.nodes[id];
+    pos[id] = { x: n.x, y: n.y };
+  }
   return pos;
 }
 
@@ -120,7 +148,6 @@ export function playMapEnter(root) {
 function buildMapHtml(run, pos, edges) {
   const map = run.map;
   const next = new Set(nextHighlightIds(run));
-  let pathI = 0;
   let lines = '';
   for (const id of Object.keys(map.nodes)) {
     const n = map.nodes[id];
@@ -128,9 +155,10 @@ function buildMapHtml(run, pos, edges) {
     for (const nid of n.next) {
       const b = pos[nid];
       const kind = pathKind(run, id, nid);
-      const curve = curveOf(a, b, pathI);
-      edges[`${id}>${nid}`] = curve;
-      const d = quadPath(a, b, pathI++);
+      const key = `${id}>${nid}`;
+      const curve = curveOf(a, b, key);
+      edges[key] = curve;
+      const d = quadPath(a, b, key);
       lines += `<path class="mapPath ink ${kind}" d="${d}"/>`;
       lines += `<path class="mapPath dust ${kind}" d="${d}"/>`;
     }
@@ -157,13 +185,6 @@ function buildMapHtml(run, pos, edges) {
   }).join('');
 
   const home = pawnHome(pos, run);
-  const rail = map.floors.map((_, f) => {
-    const cls = f < run.floor ? 'done' : (f === run.floor ? 'here' : '');
-    return `<i class="${cls}">${f + 1}</i>`;
-  }).join('');
-
-  const legend = Object.entries(TYPE_META).map(([k, m]) =>
-    `<span class="lg-${k}">${m.icon}${m.label}</span>`).join('');
 
   return `
     <div class="panel dim mapPanel" data-screen="map">
@@ -201,11 +222,6 @@ function buildMapHtml(run, pos, edges) {
             </div>
           </div>
           <div class="mapTip" hidden></div>
-        </div>
-        <div class="mapFoot">
-          <div class="mapRail">${rail}</div>
-          <div class="mapLegend">${legend}</div>
-          <p class="mapHint">走过的岔路会锁死。金色脉冲 = 下一跳。</p>
         </div>
       </div>
     </div>`;

@@ -217,9 +217,26 @@ body {
 }
 
 /* HUD 芯片：hud_chip 九宫底板，去掉圆角玻璃 */
-#runStrip .stat,
-.enemyPlate,
-#enemyBanter.show,
+#playerHud .playerHudBox {
+  box-sizing: border-box;
+  min-width: 0;
+  text-align: left;
+  letter-spacing: 0.08em;
+  color: #efe6d0;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 18px 20px;
+  border-image-source: var(--ui-frame-window);
+  border-image-slice: 192;
+  border-image-width: 18px 20px;
+  border-image-repeat: stretch;
+  background-color: #070b18;
+  background-image: radial-gradient(ellipse 78% 68% at 50% 42%, #121a32 0%, #070b18 76%);
+  font-family: var(--font-serif), var(--font-ui);
+}
+
+.banterItem,
+#enemySkillTip,
 #aimHint,
 #toast {
   border-radius: 0;
@@ -237,30 +254,9 @@ body {
   font-family: var(--font-serif), var(--font-ui);
 }
 
-#runStrip .stat {
-  min-width: 0;
-  padding: 8px 16px;
-  text-align: left;
-  letter-spacing: 0.1em;
-  color: #efe6d0;
-}
-
-#runStrip .dockMain {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  line-height: 1.45;
-}
-
-#runRelics {
-  align-self: flex-end;
-}
-
-.enemyPlate {
-  padding: 6px 16px 6px 10px;
-  color: #efe6d0;
-  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #1a1018 0%, #0c080e 72%);
+.banterItem,
+#enemySkillTip {
+  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #1a1016 0%, #0c080e 76%);
 }
 
 #llmThink {
@@ -429,24 +425,9 @@ body {
   padding-left: calc(52px + 0.42em);
 }
 
-#enemyBanter {
-  border-radius: 0;
-  overflow: hidden;
-  white-space: normal;
-}
-#enemyBanter.show {
+.banterItem {
   overflow: visible;
-  background-image: radial-gradient(ellipse 70% 54% at 50% 50%, #1a1016 0%, #0c080e 76%);
-}
-#enemyBanter.show::after {
-  content: "";
-  position: absolute;
-  right: -10px;
-  top: 18px;
-  width: 0;
-  height: 0;
-  border: 8px solid transparent;
-  border-left-color: rgba(242, 208, 137, 0.55);
+  white-space: normal;
 }
 
 @media (max-width: 900px) {
