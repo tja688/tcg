@@ -10,7 +10,7 @@ export function makeCardFaceMaterial(mapTex, noiseTex) {
       uNoise: { value: noiseTex },
       uDissolve: { value: 0 },
       uFlash: { value: 0 },
-      uFlashColor: { value: new THREE.Color(1.35, 1.32, 1.2) },
+      uFlashColor: { value: new THREE.Color(1.05, 0.88, 0.62) },
       uFoil: { value: 0 },
       uDesat: { value: 0 },
       uOpacity: { value: 1 },
@@ -51,14 +51,18 @@ export function makeCardFaceMaterial(mapTex, noiseTex) {
           float band = smoothstep(0.28, 0.92, sweep) * smoothstep(1.05, 0.5, sweep);
           float sweep2 = sin((vUv.x - vUv.y) * 9.0 + uTime * 0.95);
           float band2 = smoothstep(0.72, 1.0, sweep2);
+          float n = texture2D(uNoise, vUv * 3.4 + vec2(uTime * 0.04, -uTime * 0.03)).r;
+          float n2 = texture2D(uNoise, vUv * 7.1 - vec2(uTime * 0.06, 0.2)).g;
+          float flake = smoothstep(0.55, 0.92, n) * 0.22 + smoothstep(0.72, 1.0, n2) * 0.1;
           vec3 iri = vec3(
-            0.62 + 0.38 * sin(uTime * 0.9 + vUv.y * 7.0),
+            0.62 + 0.38 * sin(uTime * 0.9 + vUv.y * 7.0 + n * 4.0),
             0.48 + 0.42 * sin(uTime * 1.15 + vUv.x * 6.0 + 2.0),
-            0.88 + 0.12 * sin(uTime * 0.7 + 4.0)
+            0.88 + 0.12 * sin(uTime * 0.7 + 4.0 + n2 * 3.0)
           );
-          col += iri * (band * 0.24 + band2 * 0.09) * uFoil;
+          col += iri * (band * 0.26 + band2 * 0.1 + flake) * uFoil;
           float rim = 1.0 - smoothstep(0.0, 0.075, min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y)));
-          col += vec3(1.0, 0.78, 0.32) * rim * 0.28 * uFoil;
+          col += vec3(1.0, 0.78, 0.32) * rim * 0.32 * uFoil;
+          col += vec3(1.15, 0.92, 0.55) * pow(max(0.0, sweep), 8.0) * 0.18 * uFoil;
         }
 
         float lum = dot(col, vec3(0.299, 0.587, 0.114));

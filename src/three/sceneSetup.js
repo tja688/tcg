@@ -13,6 +13,9 @@ import {
   tickBackdropAbyss,
   createAbyssLayer,
 } from './abyss.js';
+import { tickVfx } from './vfx/clock.js';
+import { createAmbient } from './vfx/ambient.js';
+import { CFG } from '../config.js';
 
 const BACKDROP_TEX_KEYS = [
   'backdrop', 'backdrop_dusk', 'backdrop_ashen',
@@ -70,10 +73,13 @@ export function createWorld(container, assets) {
   scene.add(rim);
 
   const braziers = [];
+  const BX = CFG.layout.brazier.x;
+  const BZ = CFG.layout.brazier.z;
+  const BY = CFG.layout.brazier.bowlY;
   for (const sx of [-1, 1]) {
-    const p = new THREE.PointLight(0xff8438, 26, 16, 1.8);
-    p.position.set(sx * 7.6, 2.0, -3.0);
-    p.userData.base = 26;
+    const p = new THREE.PointLight(0xff8438, 18, 14, 1.8);
+    p.position.set(sx * BX, BY + 1.15, BZ);
+    p.userData.base = 18;
     scene.add(p);
     braziers.push(p);
   }
@@ -201,55 +207,63 @@ export function createWorld(container, assets) {
   }
 
   const abyss = createAbyssLayer(scene, assets);
+  const ambient = createAmbient(scene, assets);
 
-  // ---- 篝火火焰粒子（两座）：细密粒子 + 按高度变色（根部亮白→焰尖暗红）----
-  const flames = [];
+  const iron = new THREE.MeshStandardMaterial({ color: 0x3a2d42, roughness: 0.42, metalness: 0.55 });
+  const bronze = new THREE.MeshStandardMaterial({
+    color: 0xb07a38, roughness: 0.28, metalness: 0.72, emissive: 0x3a2208, emissiveIntensity: 0.35,
+  });
   for (const sx of [-1, 1]) {
-    const n = 64;
-    const pos = new Float32Array(n * 3);
-    const col = new Float32Array(n * 3);
-    const seed = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      seed[i] = Math.random();
-      pos[i * 3] = sx * 7.6 + (Math.random() - 0.5) * 0.3;
-      pos[i * 3 + 1] = 0.8 + Math.random() * 1.25;
-      pos[i * 3 + 2] = -3.0 + (Math.random() - 0.5) * 0.3;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const f = new THREE.Points(g, new THREE.PointsMaterial({
-      map: assets.glowTex, size: 0.34, transparent: true, opacity: 0.85,
-      vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
-    f.userData = { sx, seed };
-    scene.add(f);
-    flames.push(f);
+    const x = sx * BX;
+    const stand = new THREE.Group();
+    stand.position.set(x, 0, BZ);
 
-    // 火芯常亮光斑
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.64, 0.2, 10), iron);
+    base.position.y = 0.1;
+    base.castShadow = true;
+    stand.add(base);
+
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.32, 0.72, 8), iron);
+    column.position.y = 0.56;
+    column.castShadow = true;
+    stand.add(column);
+
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 0.42, 0.36, 16), bronze);
+    bowl.position.y = BY - 0.1;
+    bowl.castShadow = true;
+    stand.add(bowl);
+
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.08, 8, 28), bronze);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = BY;
+    stand.add(rim);
+
+    const coal = new THREE.Mesh(
+      new THREE.CircleGeometry(0.62, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xff5a18, transparent: true, opacity: 0.7,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    );
+    coal.rotation.x = -Math.PI / 2;
+    coal.position.y = BY - 0.02;
+    stand.add(coal);
+
     const heart = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: assets.glowTex, color: 0xffb050, transparent: true, opacity: 0.85,
+      map: assets.glowTex, color: 0xff7a28, transparent: true, opacity: 0.48,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }));
-    heart.position.set(sx * 7.6, 1.02, -3.0);
-    heart.scale.setScalar(1.5);
-    scene.add(heart);
-
-    // 火盆底座
-    const basin = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.55, 0.75, 0.8, 10),
-      new THREE.MeshStandardMaterial({ color: 0x2a2033, roughness: 0.9, metalness: 0.3 }),
-    );
-    basin.position.set(sx * 7.6, 0.4, -3.0);
-    basin.castShadow = true;
-    scene.add(basin);
+    heart.position.y = BY + 0.1;
+    heart.scale.setScalar(0.38);
+    stand.add(heart);
+    scene.add(stand);
   }
 
   // ---- 后期合成 ----
   const rt = new THREE.WebGLRenderTarget(1, 1, { samples: 4, type: THREE.HalfFloatType });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.9, 0.8);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.4, 0.52, 0.88);
   composer.addPass(bloom);
   const grade = new ShaderPass(CombatGradeShader);
   composer.addPass(grade);
@@ -303,7 +317,7 @@ export function createWorld(container, assets) {
       p.userData.base = env.brazierBase;
     }
     if (embers?.material) embers.material.color.setHex(env.ember);
-    for (const f of flames) f.material.color.setHex(env.flame);
+    ambient.applyEnv(env);
     runeRing.material.color.setHex(env.rune);
     lane.material.color.setHex(env.rune);
     rockMat.color.setHex(env.rock);
@@ -311,9 +325,13 @@ export function createWorld(container, assets) {
     if (screenFx) {
       screenFx.base.vignette = env.vignette;
       screenFx.base.sat = env.sat;
+      screenFx.base.grain = env.grain ?? 0.028;
+      screenFx.base.temperature = env.temp ?? 0.06;
       screenFx.u.uVignette.value = env.vignette;
       screenFx.u.uSat.value = env.sat;
       screenFx.u.uLift.value = env.lift;
+      screenFx.u.uGrain.value = screenFx.base.grain;
+      screenFx.u.uTemperature.value = screenFx.base.temperature;
     }
     if (world) world.envId = env.id;
     return env.id;
@@ -336,9 +354,11 @@ export function createWorld(container, assets) {
     update(dt) {
       world.time += dt;
       const t = world.time;
+      tickVfx(t);
       screenFx.update(dt);
       tickBackdropAbyss(backdropMesh, t);
       abyss.update(dt, t);
+      ambient.update(dt, t, arenaPulse);
 
       pointerCur.x += (pointerTarget.x - pointerCur.x) * Math.min(1, dt * 3.2);
       pointerCur.y += (pointerTarget.y - pointerCur.y) * Math.min(1, dt * 3.2);
@@ -380,32 +400,6 @@ export function createWorld(container, assets) {
         p.needsUpdate = true;
       }
 
-      // 火焰：上升、收拢、按高度从亮白过渡到暗红
-      for (const f of flames) {
-        const p = f.geometry.attributes.position;
-        const ca = f.geometry.attributes.color;
-        const seed = f.userData.seed;
-        const cx = f.userData.sx * 7.6;
-        for (let i = 0; i < seed.length; i++) {
-          let y = p.getY(i) + dt * (1.1 + seed[i] * 1.0);
-          if (y > 2.1) {
-            y = 0.8;
-            p.setX(i, cx + (Math.random() - 0.5) * 0.3);
-            p.setZ(i, -3.0 + (Math.random() - 0.5) * 0.3);
-          }
-          p.setY(i, y);
-          // 越高越向中心收拢
-          const k = Math.min(1, (y - 0.8) / 1.3);
-          p.setX(i, cx + (p.getX(i) - cx) * (1 - dt * k * 2.2));
-          // 颜色 ramp：根 1.0,0.98,0.85 → 中 1.0,0.55,0.25 → 尖 0.5,0.12,0.06
-          const cr = 1.0 - k * 0.5;
-          const cg = 0.98 - k * 0.86;
-          const cb = 0.85 - k * 0.79;
-          ca.setXYZ(i, cr, cg, cb);
-        }
-        p.needsUpdate = true;
-        ca.needsUpdate = true;
-      }
     },
     render() { composer.render(); },
   };

@@ -1,9 +1,22 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { TextSprite } from '../utils/canvasTex.js';
+import {
+  spawnSigil, spawnShock, spawnOrb, spawnHalo, spawnSlash,
+  spawnBoltMesh, spawnBarrier, spawnInk, spawnBeam, spawnPulse, waitTl,
+} from './vfx/kit.js';
 
 const _mid = new THREE.Vector3();
 const _dir = new THREE.Vector3();
+
+const ELEMENT_TINT = {
+  fire: 0xff6a22, lightning: 0xbfe8ff, holy: 0xffe08a,
+  shadow: 0x7a3cff, arcane: 0xb45cff, frost: 0x8fe4ff, phys: 0xffb066,
+};
+
+function elementColor(element, fallback) {
+  return ELEMENT_TINT[element] ?? fallback;
+}
 
 // =====================================================================
 // 战斗演出特效库。所有 async 方法返回 Promise，供规则引擎串联时序。
@@ -52,102 +65,73 @@ export class Effects {
     tl.to(ts.material, { opacity: 0, duration: 0.38, ease: 'power2.in' }, 0.64);
   }
 
-  // ---- 地面灼痕 ----
+  // ---- 地面灼痕 / 法阵残影 ----
   scorch(pos, color = 0xff6a22, scale = 1.7) {
-    const mat = new THREE.MeshBasicMaterial({
-      map: this.assets.ringTex, color, transparent: true, opacity: 0.5,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    const mesh = new THREE.Mesh(new THREE.CircleGeometry(0.55, 28), mat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(pos.x, 0.035, pos.z);
-    mesh.renderOrder = 8;
-    this.scene.add(mesh);
-    gsap.to(mesh.scale, { x: scale, y: scale, z: 1, duration: 0.22, ease: 'power2.out' });
-    gsap.to(mat, {
-      opacity: 0, duration: 1.45, delay: 0.18, ease: 'power1.in',
-      onComplete: () => { mesh.removeFromParent(); mat.dispose(); },
+    spawnSigil(this.scene, pos, color, {
+      radius: 0.55 + scale * 0.42, duration: 1.35, y: 0.032,
     });
   }
 
   // ---- 近战斩击弧 ----
   slash(from, to, color = 0xffe0a8) {
-    const mid = _mid.copy(from).lerp(to, 0.64);
-    mid.y += 0.22;
-    const mat = new THREE.MeshBasicMaterial({
-      map: this.assets.slashTex, color, transparent: true, opacity: 0.95,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, depthTest: false,
-    });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 0.62), mat);
-    mesh.position.copy(mid);
-    mesh.lookAt(to);
-    mesh.renderOrder = 720;
-    this.scene.add(mesh);
-    mesh.scale.set(0.15, 0.7, 1);
-    gsap.timeline({
-      onComplete: () => { mesh.removeFromParent(); mat.dispose(); },
-    })
-      .to(mesh.scale, { x: 1, y: 1, duration: 0.1, ease: 'power3.out' }, 0)
-      .to(mat, { opacity: 0, duration: 0.22, ease: 'power2.in' }, 0.08);
-    this.particles.sparks(to, { count: 8, color, speed: 5.5 });
+    spawnSlash(this.scene, from, to, color);
+    const mid = _mid.copy(from).lerp(to, 0.7);
+    mid.y += 0.1;
+    this.particles.sparks(to, { count: 10, color, speed: 6.2 });
+    this.particles.debris(to, { count: 5, color, speed: 3.4 });
+    spawnShock(this.scene, to, color, { reach: 2.1, duration: 0.28, lift: 0.12 });
   }
 
   // ---- 冲击命中 ----
   impact(pos, color = 0xffb066, strength = 1, { feel = true, element = 'phys' } = {}) {
-    const ringMat = new THREE.SpriteMaterial({
-      map: this.assets.ringTex, color, transparent: true, opacity: 0.95,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+    const tint = elementColor(element, color);
+    spawnShock(this.scene, pos, tint, {
+      reach: 2.2 + strength * 1.1, duration: 0.38, lift: 0.16 + strength * 0.08,
     });
-    const ring = new THREE.Sprite(ringMat);
-    ring.position.copy(pos);
-    ring.renderOrder = 600;
-    ring.scale.setScalar(0.35);
-    this.scene.add(ring);
-    gsap.to(ring.scale, { x: 2.7 * strength, y: 2.7 * strength, duration: 0.36, ease: 'power2.out' });
-    gsap.to(ringMat, {
-      opacity: 0, duration: 0.36, ease: 'power1.out',
-      onComplete: () => { ring.removeFromParent(); ringMat.dispose(); },
-    });
+    if (strength >= 0.7) {
+      spawnSigil(this.scene, pos, tint, {
+        radius: 0.7 + strength * 0.45, duration: 0.7, y: 0.03,
+      });
+    }
 
-    const flashMat = new THREE.SpriteMaterial({
-      map: this.assets.glowTex, color: 0xffffff, transparent: true, opacity: 0.95,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const flash = new THREE.Sprite(flashMat);
-    flash.position.copy(pos);
-    flash.scale.setScalar(1.75 * strength);
-    flash.renderOrder = 601;
-    this.scene.add(flash);
-    gsap.to(flashMat, {
-      opacity: 0, duration: 0.2,
-      onComplete: () => { flash.removeFromParent(); flashMat.dispose(); },
-    });
+    if (feel) {
+      const flashMat = new THREE.SpriteMaterial({
+        map: this.assets.glowTex, color: tint, transparent: true, opacity: 0.28,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      const flash = new THREE.Sprite(flashMat);
+      flash.position.copy(pos);
+      flash.scale.setScalar(0.95 * strength);
+      flash.renderOrder = 601;
+      this.scene.add(flash);
+      gsap.to(flashMat, {
+        opacity: 0, duration: 0.22,
+        onComplete: () => { flash.removeFromParent(); flashMat.dispose(); },
+      });
+    }
 
     this.particles.burst(pos, {
-      count: Math.round(12 * strength), speed: 4.4 * strength, color,
-      size: 0.24, life: 0.48, gravity: -6, spread: 1,
+      count: Math.round(14 * strength), speed: 4.6 * strength, color: tint,
+      size: 0.24, life: 0.5, gravity: -6, spread: 1,
     });
     this.particles.sparks(pos, {
-      count: Math.round(7 * strength), color, speed: 6 * strength,
+      count: Math.round(8 * strength), color: tint, speed: 6.4 * strength,
     });
-    if (strength >= 0.85) this.scorch(pos, color, 1.35 + strength * 0.45);
+    if (strength >= 1.0) this.particles.smoke(pos, { count: 5, color: tint, size: 0.42 });
+    if (strength >= 0.85) this.scorch(pos, tint, 1.2 + strength * 0.4);
 
     if (feel) {
       const dir = _dir.set(pos.x * 0.15, 0, pos.z * 0.1);
       this.world.shake(0.2 * strength, { dir });
       this.world.pulseArena?.(0.35 * strength);
-      const tintMap = {
-        fire: 0xff6a22, lightning: 0xbfe8ff, holy: 0xffe08a,
-        shadow: 0x7a3cff, arcane: 0xb45cff, frost: 0x8fe4ff, phys: color,
-      };
       this.screen()?.punch({
-        flash: 0.08 * strength,
-        tint: tintMap[element] || color,
-        tintAmt: element === 'phys' ? 0.08 : 0.16 * strength,
-        aberration: 0.28 * strength,
-        bloom: 0.16 * strength,
+        flash: 0.03 * strength,
+        tint,
+        tintAmt: element === 'phys' ? 0.05 : 0.09 * strength,
+        aberration: 0.16 * strength,
+        bloom: 0.07 * strength,
         shock: strength >= 1.25,
-        contrast: 0.08 * strength,
+        contrast: 0.04 * strength,
       });
     }
   }
@@ -193,27 +177,18 @@ export class Effects {
   async projectile(from, to, {
     color = 0xff7a26, size = 1, arc = 2.1, element = 'fire', duration = 0.55,
   } = {}) {
-    const group = new THREE.Group();
-    const coreMat = new THREE.SpriteMaterial({
-      map: this.assets.glowTex, color: 0xfff2cc, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const core = new THREE.Sprite(coreMat);
-    core.scale.setScalar(0.55 * size);
-    core.renderOrder = 700;
+    const orb = spawnOrb(this.scene, from, color, { size: 0.28 * size });
     const haloMat = new THREE.SpriteMaterial({
       map: this.assets.glowTex, color, transparent: true, opacity: 0.88,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const halo = new THREE.Sprite(haloMat);
-    halo.scale.setScalar(1.4 * size);
+    halo.scale.setScalar(1.45 * size);
     halo.renderOrder = 699;
-    group.add(halo, core);
-    group.position.copy(from);
+    orb.mesh.add(halo);
 
-    const light = new THREE.PointLight(color, element === 'shadow' ? 18 : 36, 9, 1.9);
-    group.add(light);
-    this.scene.add(group);
+    const light = new THREE.PointLight(color, element === 'shadow' ? 12 : 20, 8, 1.9);
+    orb.mesh.add(light);
     this.sfx.cue('sfx.effect.whoosh');
 
     const ctrl = from.clone().add(to).multiplyScalar(0.5).add(new THREE.Vector3(0, arc, 0));
@@ -223,18 +198,21 @@ export class Effects {
     await gsap.to(state, {
       t: 1, duration, ease: 'power1.in',
       onUpdate: () => {
-        curve.getPoint(state.t, group.position);
-        const pulse = 1 + 0.12 * Math.sin(state.t * 28);
-        core.scale.setScalar(0.55 * size * pulse);
-        halo.scale.setScalar(1.4 * size * pulse);
+        curve.getPoint(state.t, orb.mesh.position);
+        const pulse = 1 + 0.14 * Math.sin(state.t * 28);
+        orb.mesh.scale.setScalar(0.28 * size * pulse);
+        halo.scale.setScalar(1.45 * size * pulse);
         trailAcc += 1;
         if (trailAcc % 2 === 0) {
           this.particles.spawn({
-            pos: group.position.clone(),
+            pos: orb.mesh.position.clone(),
             vel: new THREE.Vector3((Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.8),
-            life: 0.38, size: 0.28 * size, sizeEnd: 0.02, color, gravity: 0.4, drag: 0.9,
-            tex: this.assets.streakTex, stretch: 2.1,
+            life: 0.4, size: 0.3 * size, sizeEnd: 0.02, color, gravity: 0.4, drag: 0.9,
+            tex: this.assets.streakTex, stretch: 2.2,
           });
+        }
+        if (element === 'fire' && trailAcc % 5 === 0) {
+          this.particles.smoke(orb.mesh.position, { count: 1, color, size: 0.28 * size, life: 0.45 });
         }
       },
     });
@@ -250,10 +228,11 @@ export class Effects {
     this.sfx.cue(impactCue);
     if (size >= 1.1) await this.screen()?.hitStop(40);
     gsap.to(light, {
-      intensity: 0, duration: 0.28,
+      intensity: 0, duration: 0.22,
       onComplete: () => {
-        group.removeFromParent();
-        coreMat.dispose(); haloMat.dispose();
+        halo.removeFromParent();
+        haloMat.dispose();
+        orb.dispose();
       },
     });
   }
@@ -272,7 +251,11 @@ export class Effects {
 
   _mkBolt(to, { radius, opacity, color = 0xcfe8ff, jitter = 1.1, segs = 9 }) {
     const pts = [];
-    const top = to.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.2, 8.5, (Math.random() - 0.5) * 1.2));
+    const top = to.clone().add(new THREE.Vector3(
+      (Math.random() - 0.5) * 3.8,
+      3.4 + Math.random() * 1.2,
+      4.2 + Math.random() * 1.4,
+    ));
     for (let i = 0; i <= segs; i++) {
       const k = i / segs;
       const p = top.clone().lerp(to, k);
@@ -283,79 +266,68 @@ export class Effects {
       pts.push(p);
     }
     const curve = new THREE.CatmullRomCurve3(pts);
-    const geo = new THREE.TubeGeometry(curve, 36, radius, 6, false);
-    const mat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = 700;
-    this.scene.add(mesh);
-    return { mesh, mat, geo };
+    const geo = new THREE.TubeGeometry(curve, 40, radius, 7, false);
+    return spawnBoltMesh(this.scene, geo, color, opacity);
   }
 
   // ---- 闪电打击 ----
   async lightning(to) {
     this.sfx.cue('sfx.spell.lightning');
     const bolts = [
-      this._mkBolt(to, { radius: 0.06, opacity: 1, color: 0xe8f4ff }),
-      this._mkBolt(to, { radius: 0.16, opacity: 0.32, color: 0x8ec8ff }),
-      this._mkBolt(to, { radius: 0.035, opacity: 0.95, color: 0xffffff }),
-      this._mkBolt(to, { radius: 0.028, opacity: 0.7, color: 0xb8e0ff, jitter: 2.1, segs: 7 }),
+      this._mkBolt(to, { radius: 0.07, opacity: 0.88, color: 0xcfe6ff }),
+      this._mkBolt(to, { radius: 0.18, opacity: 0.32, color: 0x8ec8ff }),
+      this._mkBolt(to, { radius: 0.04, opacity: 0.7, color: 0xd8ecff }),
+      this._mkBolt(to, { radius: 0.034, opacity: 0.55, color: 0xb8e0ff, jitter: 2.1, segs: 7 }),
+      this._mkBolt(to, { radius: 0.028, opacity: 0.42, color: 0x9fd4ff, jitter: 2.6, segs: 8 }),
     ];
 
-    const flashMat = new THREE.SpriteMaterial({
-      map: this.assets.glowTex, color: 0xbfe0ff, transparent: true, opacity: 1,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const flash = new THREE.Sprite(flashMat);
-    flash.position.copy(to);
-    flash.scale.setScalar(3.3);
-    flash.renderOrder = 701;
-    this.scene.add(flash);
+    spawnHalo(this.scene, to, 0x7fb4e6, { size: 1.2, duration: 0.36 });
+    spawnSigil(this.scene, to, 0x9fd4ff, { radius: 1.35, duration: 0.58 });
+    spawnShock(this.scene, to, 0x9fd4ff, { reach: 2.6, duration: 0.34, lift: 0.16 });
 
     this.world.shake(0.42);
     this.world.pulseArena?.(0.7);
     this.impact(to, 0x9fd4ff, 1.35, { element: 'lightning', feel: false });
-    this.particles.stars(to, { count: 10, color: 0xd8f0ff, speed: 3.2 });
+    this.particles.stars(to, { count: 12, color: 0xd8f0ff, speed: 3.4 });
+    this.particles.sparks(to, { count: 10, color: 0xe8f4ff, speed: 7 });
     this.screen()?.punch({
-      flash: 0.16, tint: 0xb8e6ff, tintAmt: 0.2, aberration: 0.72,
-      bloom: 0.34, contrast: 0.14, shock: 0.85, shake: 0.12, hitstop: 48,
+      flash: 0.03, tint: 0x9ec8ee, tintAmt: 0.1, aberration: 0.32,
+      bloom: 0.1, contrast: 0.05, shock: 0.5, shake: 0.08, hitstop: 28,
     });
 
     const state = { o: 1 };
     await gsap.to(state, {
-      o: 0, duration: 0.4, ease: 'power2.in',
+      o: 0, duration: 0.42, ease: 'power2.in',
       onUpdate: () => {
-        const flicker = state.o * (0.45 + 0.55 * Math.sin(state.o * 52));
-        for (const b of bolts) b.mat.opacity = flicker;
-        flashMat.opacity = state.o;
+        const flicker = state.o * (0.4 + 0.6 * Math.sin(state.o * 58));
+        for (const b of bolts) b.mat.uniforms.uFade.value = flicker;
       },
     });
     for (const b of bolts) {
       b.mesh.removeFromParent(); b.mat.dispose(); b.geo.dispose();
     }
-    flash.removeFromParent();
-    flashMat.dispose();
   }
 
   // ---- 圣击（金光落雷）----
   async holyBolt(to) {
     this.sfx.cue('sfx.spell.holy');
     const bolts = [
-      this._mkBolt(to, { radius: 0.05, opacity: 1, color: 0xfff4c8, jitter: 0.45, segs: 6 }),
-      this._mkBolt(to, { radius: 0.14, opacity: 0.3, color: 0xffd166, jitter: 0.55, segs: 6 }),
+      this._mkBolt(to, { radius: 0.042, opacity: 0.78, color: 0xf2d080, jitter: 0.7, segs: 6 }),
+      this._mkBolt(to, { radius: 0.1, opacity: 0.24, color: 0xe0b24a, jitter: 0.8, segs: 6 }),
     ];
-    this.particles.stars(to, { count: 12, color: 0xffe08a, speed: 2.6 });
-    this.impact(to, 0xffe08a, 1.15, { element: 'holy' });
+    spawnSigil(this.scene, to, 0xffd166, { radius: 1.05, duration: 0.55 });
+    this.particles.stars(to, { count: 12, color: 0xffe08a, speed: 2.4 });
+    this.impact(to, 0xffe08a, 1.05, { element: 'holy', feel: false });
     this.screen()?.punch({
-      flash: 0.18, tint: 0xffe08a, tintAmt: 0.2, bloom: 0.32, aberration: 0.35, hitstop: 30,
+      flash: 0.035, tint: 0xf2c86a, tintAmt: 0.12, bloom: 0.1, aberration: 0.2, hitstop: 22,
     });
     const state = { o: 1 };
     await gsap.to(state, {
-      o: 0, duration: 0.38, ease: 'power2.in',
+      o: 0, duration: 0.4, ease: 'power2.in',
       onUpdate: () => {
-        for (const b of bolts) b.mat.opacity = state.o * (0.6 + 0.4 * Math.sin(state.o * 24));
+        for (const b of bolts) {
+          b.mat.uniforms.uFade.value = state.o * (0.55 + 0.45 * Math.sin(state.o * 24));
+        }
       },
     });
     for (const b of bolts) {
@@ -366,73 +338,38 @@ export class Effects {
   // ---- 治疗 ----
   async heal(pos) {
     this.sfx.cue('battle.combat.heal');
-    const glowMat = new THREE.SpriteMaterial({
-      map: this.assets.glowTex, color: 0xffe9a8, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const glow = new THREE.Sprite(glowMat);
-    glow.position.copy(pos);
-    glow.scale.setScalar(2.3);
-    glow.renderOrder = 600;
-    this.scene.add(glow);
-
-    for (let i = 0; i < 2; i++) {
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xffe08a, transparent: true, opacity: 0.55,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-      });
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.15, 0.28, 40), ringMat);
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.set(pos.x, 0.08 + i * 0.04, pos.z);
-      this.scene.add(ring);
-      gsap.timeline({
-        onComplete: () => { ring.removeFromParent(); ringMat.dispose(); },
-      })
-        .to(ring.scale, { x: 3.6, y: 3.6, duration: 0.7, ease: 'power2.out' }, 0)
-        .to(ringMat, { opacity: 0, duration: 0.7, ease: 'power1.in' }, 0)
-        .delay(i * 0.08);
-    }
-
-    this.particles.rise(pos, { count: 22, color: 0xffe08a, size: 0.24, life: 1.25, speed: 1.7 });
-    this.particles.stars(pos, { count: 6, color: 0xfff3c4, speed: 1.4, life: 0.7 });
-    this.screen()?.punch({ tint: 0xffe08a, tintAmt: 0.14, bloom: 0.22, flash: 0.06 });
-    await gsap.timeline()
-      .to(glowMat, { opacity: 0.8, duration: 0.26, ease: 'power2.out' })
-      .to(glowMat, { opacity: 0, duration: 0.55, ease: 'power1.in' });
-    glow.removeFromParent();
-    glowMat.dispose();
+    spawnHalo(this.scene, pos, 0xffe9a8, { size: 1.8, duration: 0.8 });
+    const sigil = spawnSigil(this.scene, pos, 0xffe08a, { radius: 1.7, duration: 0.85 });
+    spawnBeam(this.scene, pos, 0xfff0c0, { width: 0.85, height: 2.4, duration: 0.65, y: 0.5 });
+    this.particles.rise(pos, { count: 24, color: 0xffe08a, size: 0.24, life: 1.25, speed: 1.7 });
+    this.particles.stars(pos, { count: 8, color: 0xfff3c4, speed: 1.5, life: 0.75 });
+    this.particles.wisps(pos, { count: 8, color: 0xffe08a, speed: 1.1 });
+    this.screen()?.punch({ tint: 0xffe08a, tintAmt: 0.08, bloom: 0.08, flash: 0.018 });
+    await waitTl(sigil.tl);
   }
 
   // ---- 霜盾 / 护甲 ----
   async frostShield(pos) {
     this.sfx.cue('battle.combat.armor_gain');
-    const ringGeo = new THREE.TorusGeometry(0.85, 0.07, 8, 48);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x8fe4ff, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+    const barrier = spawnBarrier(this.scene, pos.clone().add(new THREE.Vector3(0, 0.15, 0)), 0x8fe4ff, {
+      radius: 1.2, duration: 0.72,
     });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(pos.x, 0.2, pos.z);
-    this.scene.add(ring);
+    spawnSigil(this.scene, pos, 0x8fe4ff, { radius: 1.45, duration: 0.7 });
     this.particles.burst(pos, {
       count: 16, speed: 2.4, color: 0xa8ecff, size: 0.2, life: 0.7, gravity: -1, spread: 1.1,
     });
-    this.particles.stars(pos, { count: 7, color: 0xd8f6ff, speed: 1.8 });
-    this.screen()?.punch({ tint: 0x8fe4ff, tintAmt: 0.16, bloom: 0.16, flash: 0.05 });
-    await gsap.timeline()
-      .to(ring.scale, { x: 2.4, y: 2.4, z: 1.2, duration: 0.45, ease: 'power2.out' }, 0)
-      .to(ringMat, { opacity: 0, duration: 0.45, ease: 'power1.in' }, 0);
-    ring.removeFromParent();
-    ringGeo.dispose(); ringMat.dispose();
+    this.particles.stars(pos, { count: 8, color: 0xd8f6ff, speed: 1.8 });
+    this.particles.debris(pos, { count: 6, color: 0xc8f4ff, speed: 2.2 });
+    this.screen()?.punch({ tint: 0x8fe4ff, tintAmt: 0.1, bloom: 0.07, flash: 0.016 });
+    await waitTl(barrier.tl);
   }
 
   // ---- 流星火雨（AOE）----
   async firestorm(positions) {
     this.sfx.rumble();
     this.screen()?.punch({
-      tint: 0xff4a14, tintAmt: 0.32, vignette: 0.28, letterbox: 0.055,
-      bloom: 0.18, contrast: 0.1,
+      tint: 0xff4a14, tintAmt: 0.18, vignette: 0.2, letterbox: 0.04,
+      bloom: 0.08, contrast: 0.05,
     });
     this.world.shake(0.28);
     this.world.pulseArena?.(0.55);
@@ -446,7 +383,7 @@ export class Effects {
       await this.projectile(from, p, { color: 0xff6a22, size: 0.82, arc: 0.35, element: 'fire', duration: 0.42 });
     })());
     await Promise.all(jobs);
-    this.screen()?.punch({ shock: 1.1, shake: 0.22, flash: 0.12, bloom: 0.2 });
+    this.screen()?.punch({ shock: 0.85, shake: 0.16, flash: 0.035, bloom: 0.08 });
   }
 
   // ---- 战吼冲击波 ----
@@ -455,32 +392,24 @@ export class Effects {
     this.world.shake(0.52);
     this.world.pulseArena?.(1);
     this.screen()?.punch({
-      tint: color, tintAmt: 0.28, letterbox: 0.07, shock: 1.15,
-      bloom: 0.28, contrast: 0.14, aberration: 0.4, hitstop: 55,
+      tint: color, tintAmt: 0.16, letterbox: 0.05, shock: 0.9,
+      bloom: 0.1, contrast: 0.06, aberration: 0.22, hitstop: 36,
     });
-    const ringGeo = new THREE.TorusGeometry(1, 0.14, 10, 64);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.9,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(pos.x, 0.15, pos.z);
-    this.scene.add(ring);
-    this.particles.burst(pos, { count: 26, speed: 5.4, color, size: 0.3, life: 0.75, gravity: -3, spread: 1.4 });
-    this.particles.sparks(pos, { count: 12, color, speed: 7 });
-    await gsap.timeline()
-      .to(ring.scale, { x: 7, y: 7, z: 1.5, duration: 0.55, ease: 'power2.out' }, 0)
-      .to(ringMat, { opacity: 0, duration: 0.55, ease: 'power1.in' }, 0);
-    ring.removeFromParent();
-    ringGeo.dispose(); ringMat.dispose();
+    const shock = spawnShock(this.scene, pos, color, { reach: 8.2, duration: 0.62, lift: 0.46 });
+    spawnSigil(this.scene, pos, color, { radius: 3.1, duration: 0.78 });
+    spawnBeam(this.scene, pos, color, { width: 1.55, height: 2.8, duration: 0.5, y: 0.4 });
+    this.particles.burst(pos, { count: 28, speed: 5.6, color, size: 0.3, life: 0.75, gravity: -3, spread: 1.4 });
+    this.particles.sparks(pos, { count: 14, color, speed: 7.2 });
+    this.particles.smoke(pos, { count: 8, color, size: 0.55 });
+    await waitTl(shock.tl);
   }
 
   // ---- 召唤落场 ----
   summonImpact(pos, color = 0x9fd4ff) {
+    spawnSigil(this.scene, pos, color, { radius: 1.25, duration: 0.62 });
     this.impact(new THREE.Vector3(pos.x, 0.25, pos.z), color, 0.85, { feel: true, element: 'arcane' });
     this.particles.burst(new THREE.Vector3(pos.x, 0.2, pos.z), {
-      count: 12, speed: 2.3, color: 0xcbb8ff, size: 0.22, life: 0.5, gravity: -2, spread: 1.2,
+      count: 14, speed: 2.4, color: 0xcbb8ff, size: 0.22, life: 0.5, gravity: -2, spread: 1.2,
     });
     this.sfx.place();
   }
@@ -493,6 +422,8 @@ export class Effects {
     this.particles.burst(pos, {
       count: 8, speed: 1.6, color: 0x4a3040, size: 0.18, life: 0.7, gravity: -2, spread: 0.9,
     });
+    this.particles.smoke(pos, { count: 6, color: 0x4a3040, size: 0.4 });
+    this.particles.debris(pos, { count: 7, color: 0xff8a4d, speed: 2.4 });
     visual.setRing('hidden');
     visual.tauntIcon.visible = false;
     gsap.to(visual.backMat, { opacity: 0, duration: fast ? 0.4 : 0.7, ease: 'power1.in' });
@@ -505,30 +436,27 @@ export class Effects {
 
   // ---- 奥术施法涟漪 ----
   async flourish(pos, color = 0xb45cff, { cue = 'sfx.spell.arcane' } = {}) {
-    this.sfx.cue(cue);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity: 0.7,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.36, 40), ringMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(pos.x, 0.06, pos.z);
-    this.scene.add(ring);
+    if (cue) this.sfx.cue(cue);
+    const sigil = spawnSigil(this.scene, pos, color, { radius: 2.25, duration: 0.68 });
+    spawnHalo(this.scene, pos.clone().add(new THREE.Vector3(0, 0.35, 0)), color, { size: 1.7, duration: 0.55 });
+    spawnShock(this.scene, pos, color, { reach: 3.4, duration: 0.4, lift: 0.18 });
+    spawnPulse(this.scene, pos.clone().add(new THREE.Vector3(0, 0.5, 0)), color, { size: 0.32, duration: 0.48 });
     this.particles.burst(pos, { count: 18, speed: 2.7, color, size: 0.24, life: 0.7, gravity: 0.5, spread: 1 });
-    this.particles.stars(pos, { count: 5, color, speed: 1.8, life: 0.55 });
-    this.screen()?.punch({ tint: color, tintAmt: 0.14, bloom: 0.14, flash: 0.04 });
-    await gsap.timeline()
-      .to(ring.scale, { x: 3.2, y: 3.2, duration: 0.42, ease: 'power2.out' }, 0)
-      .to(ringMat, { opacity: 0, duration: 0.42, ease: 'power1.in' }, 0);
-    ring.removeFromParent();
-    ringMat.dispose();
+    this.particles.stars(pos, { count: 6, color, speed: 1.8, life: 0.55 });
+    this.particles.wisps(pos, { count: 6, color, speed: 1.2 });
+    this.screen()?.punch({ tint: color, tintAmt: 0.08, bloom: 0.06, flash: 0.014 });
+    await waitTl(sigil.tl);
   }
 
   async shadowDrain(pos) {
     this.sfx.cue('sfx.spell.shadow');
-    this.particles.sink(pos, { count: 16, color: 0x8a4cff, size: 0.2, life: 0.9, speed: 1.3 });
-    this.screen()?.punch({ tint: 0x6a2cff, tintAmt: 0.2, vignette: 0.12, flash: 0.03 });
-    await new Promise((r) => setTimeout(r, 280));
+    spawnInk(this.scene, pos, 0x8a4cff, { height: 1.9, radius: 0.95, duration: 0.9 });
+    spawnSigil(this.scene, pos, 0x6a2cff, { radius: 1.35, duration: 0.75 });
+    spawnHalo(this.scene, pos.clone().add(new THREE.Vector3(0, 0.45, 0)), 0x8a4cff, { size: 2.2, duration: 0.7 });
+    this.particles.sink(pos, { count: 18, color: 0x8a4cff, size: 0.2, life: 0.9, speed: 1.3 });
+    this.particles.wisps(pos, { count: 8, color: 0x6a2cff, speed: 0.7 });
+    this.screen()?.punch({ tint: 0x6a2cff, tintAmt: 0.12, vignette: 0.1, flash: 0.012 });
+    await new Promise((r) => setTimeout(r, 320));
   }
 
   // ---- 胜利金雨 ----
@@ -540,6 +468,7 @@ export class Effects {
     ];
     positions.forEach((p, i) => {
       setTimeout(() => {
+        spawnHalo(this.scene, p, [0xffd166, 0xff8fab, 0x8fd3ff][i % 3], { size: 2.4, duration: 0.9 });
         this.particles.burst(p, {
           count: 28, speed: 5.6, color: [0xffd166, 0xff8fab, 0x8fd3ff][i % 3],
           size: 0.3, life: 1.45, gravity: -4.5, spread: 1, up: 1.2,
@@ -549,4 +478,3 @@ export class Effects {
     });
   }
 }
-

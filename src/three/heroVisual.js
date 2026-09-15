@@ -14,6 +14,7 @@ export class HeroVisual {
     this.group.position.fromArray(CFG.layout.heroPos[side]);
 
     const tilt = side === 'player' ? -0.34 : -0.16;
+    const portraitR = side === 'player' ? 0.9 : 1.08;
 
     this.portraitCanvas = document.createElement('canvas');
     this.portraitCanvas.width = this.portraitCanvas.height = 512;
@@ -23,7 +24,7 @@ export class HeroVisual {
     this.paintPortrait(portraitKey || (side === 'player' ? 'hero_mage' : 'hero_warlock'));
 
     this.portraitMat = new THREE.MeshBasicMaterial({ map: this.portraitTex, transparent: true });
-    this.portrait = new THREE.Mesh(new THREE.CircleGeometry(1.08, 56), this.portraitMat);
+    this.portrait = new THREE.Mesh(new THREE.CircleGeometry(portraitR, 56), this.portraitMat);
     this.portrait.userData.heroVisual = this;
     this.portrait.castShadow = true;
 
@@ -35,7 +36,7 @@ export class HeroVisual {
     // 金属描环
     const rimColor = side === 'player' ? 0xd9b465 : 0x8f3a2e;
     const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(1.1, 0.055, 12, 72),
+      new THREE.TorusGeometry(portraitR + 0.02, 0.05, 12, 72),
       new THREE.MeshStandardMaterial({ color: rimColor, metalness: 0.92, roughness: 0.28 }),
     );
     this.pivot.add(rim);
@@ -45,7 +46,7 @@ export class HeroVisual {
       color: 0xff2a1a, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
-    const hitOverlay = new THREE.Mesh(new THREE.CircleGeometry(1.08, 56), this.hitMat);
+    const hitOverlay = new THREE.Mesh(new THREE.CircleGeometry(portraitR, 56), this.hitMat);
     hitOverlay.position.z = 0.01;
     this.pivot.add(hitOverlay);
 
@@ -54,7 +55,7 @@ export class HeroVisual {
       color: CFG.colors.targetGlow, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
-    const targetRing = new THREE.Mesh(new THREE.TorusGeometry(1.22, 0.045, 10, 72), this.targetMat);
+    const targetRing = new THREE.Mesh(new THREE.TorusGeometry(portraitR + 0.14, 0.04, 10, 72), this.targetMat);
     targetRing.position.z = 0.02;
     this.pivot.add(targetRing);
 
@@ -67,9 +68,9 @@ export class HeroVisual {
       map: this.hpTex, transparent: true, depthWrite: false, depthTest: false,
     }));
     this.hpSprite.renderOrder = 60;
-    this.hpSprite.scale.set(1.05, 1.05, 1);
-    // 血球放在头像靠场地一侧，避免贴屏边被裁
-    if (side === 'player') this.hpSprite.position.set(1.34, 0.26, 0.25);
+    this.hpSprite.scale.set(0.92, 0.92, 1);
+    // 玩家血球贴头像左下，避免伸进手牌；敌人仍靠场地一侧
+    if (side === 'player') this.hpSprite.position.set(1.08, 0.08, 0.22);
     else this.hpSprite.position.set(-1.62, 0.18, 0.28);
     this._hpPunch = 0;
     // 低血时的红色呼吸光晕
@@ -77,7 +78,7 @@ export class HeroVisual {
       map: assets.glowTex, color: 0xff2a14, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }));
-    this.hpGlow.scale.set(2.1, 2.1, 1);
+    this.hpGlow.scale.set(1.7, 1.7, 1);
     this.hpGlow.position.copy(this.hpSprite.position).add(new THREE.Vector3(0, 0, -0.06));
     this.hpGlow.renderOrder = 59;
     this.hpGlow.material.depthTest = false;
@@ -107,8 +108,8 @@ export class HeroVisual {
         map: assets.glowTex, color: 0x2a9fd8, transparent: true,
         opacity: 0.3, depthWrite: false,
       }));
-      glow.scale.set(3.6, 1.2, 1);
-      glow.position.set(dir * 1.35, -0.16, -0.08);
+      glow.scale.set(2.15, 0.82, 1);
+      glow.position.set(dir * 1.05, -0.16, -0.08);
       this.manaGroup.add(glow);
     }
     for (let i = 0; i < CFG.rules.maxMana; i++) {
@@ -421,7 +422,7 @@ export class HeroVisual {
     // 血球：受击弹跳 + 低血心跳
     const low = this.hero.hp <= 10;
     const beat = low ? Math.max(0, Math.sin(t * 4.8)) ** 2 * 0.05 : 0;
-    const s = 1.05 * (1 + this._hpPunch * 0.3 + beat);
+    const s = (this.side === 'player' ? 0.92 : 1.05) * (1 + this._hpPunch * 0.3 + beat);
     this.hpSprite.scale.set(s, s, 1);
     this.hpGlow.material.opacity = low ? 0.22 + Math.max(0, Math.sin(t * 4.8)) * 0.3 : 0;
     // 头像轻微呼吸（法力组反向补偿，保持水晶稳定在台面上）

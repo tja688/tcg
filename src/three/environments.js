@@ -24,6 +24,9 @@ export const ARENA_ENVS = {
     vignette: 1.0,
     sat: 1.12,
     lift: 0.014,
+    grain: 0.026,
+    temp: 0.08,
+    mote: 0xd2b48c,
   },
   ashen: {
     id: 'ashen',
@@ -48,6 +51,9 @@ export const ARENA_ENVS = {
     vignette: 1.08,
     sat: 1.14,
     lift: 0.01,
+    grain: 0.032,
+    temp: 0.14,
+    mote: 0xff8a4a,
   },
   void: {
     id: 'void',
@@ -72,6 +78,9 @@ export const ARENA_ENVS = {
     vignette: 1.08,
     sat: 1.16,
     lift: 0.012,
+    grain: 0.03,
+    temp: -0.06,
+    mote: 0xb8a0ff,
   },
   threshold: {
     id: 'threshold',
@@ -96,6 +105,9 @@ export const ARENA_ENVS = {
     vignette: 1.16,
     sat: 1.08,
     lift: 0.008,
+    grain: 0.034,
+    temp: 0.04,
+    mote: 0xff6a88,
   },
   abyss: {
     id: 'abyss',
@@ -120,6 +132,9 @@ export const ARENA_ENVS = {
     vignette: 1.22,
     sat: 1.06,
     lift: 0.006,
+    grain: 0.038,
+    temp: 0.02,
+    mote: 0xff4068,
   },
 };
 

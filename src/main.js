@@ -56,7 +56,7 @@ async function boot() {
   };
 
   window.__tcg = {
-    director, world, seed, errors, run, sfx, cheat, tutorial,
+    director, world, seed, errors, run, sfx, cheat, tutorial, gsap,
     resetTutorial: () => {
       tutorial.cancelForReset();
       return true;
@@ -121,7 +121,13 @@ async function boot() {
       punch: (opts) => world.screenFx?.punch(opts),
       lightning: () => effects.lightning(new THREE.Vector3(0, 1.2, -2.2)),
       fireball: () => effects.projectile(new THREE.Vector3(0, 3.2, 2.4), new THREE.Vector3(0, 1.2, -2.2), { color: 0xff7a26, size: 1.2, arc: 2.4, element: 'fire' }),
-      heal: () => effects.heal(new THREE.Vector3(-5.5, 1.2, 4.7)),
+      heal: () => effects.heal(new THREE.Vector3(-7.05, 1.0, 5.28)),
+      slash: () => effects.slash(new THREE.Vector3(-1.2, 1.4, 1.6), new THREE.Vector3(0.4, 1.2, -1.8), 0xffe0a8),
+      frost: () => effects.frostShield(new THREE.Vector3(-7.05, 1.0, 5.28)),
+      flourish: () => effects.flourish(new THREE.Vector3(0, 0.2, 0), 0xb45cff),
+      shadow: () => effects.shadowDrain(new THREE.Vector3(0, 1.1, -2.0)),
+      roar: () => effects.roar(new THREE.Vector3(0, 0.2, 0), 0xff5040),
+      holy: () => effects.holyBolt(new THREE.Vector3(0, 1.2, -2.2)),
     },
   };
 

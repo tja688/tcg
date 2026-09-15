@@ -174,12 +174,10 @@ export class Screens {
           <div class="eyebrow">ARCANE DUEL · ACT I</div>
           <h1>暮光回廊</h1>
           <div class="titleRule"></div>
-          <p class="lead">一幕短征程。先选一份初始卡包，再走分支地图、遭遇与商店，最终对上深渊魔王。</p>
           <div class="titleActions">
             <button class="goldBtn cta" data-testid="start-run" type="button">开启远征</button>
             <button class="ghostBtn" data-testid="open-settings" type="button">设置</button>
           </div>
-          <p class="titleHint">拖拽手牌召唤 · 瞄准随从攻击 · 金色符印或空格结束回合</p>
         </div>
       </div>`, { soft: true, kind: 'title' });
     return new Promise((resolve) => {

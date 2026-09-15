@@ -227,10 +227,23 @@ export class Hud {
     if (!this.playerHud$) return;
     if (!pos) {
       this.playerHud$.style.maxWidth = '';
+      this.playerHud$.style.left = '';
+      this.playerHud$.style.top = '';
+      this.playerHud$.style.bottom = '';
       return;
     }
-    const limit = Math.max(160, Math.floor(pos.hpX - pos.hpR - 14));
-    this.playerHud$.style.maxWidth = `${Math.min(220, limit)}px`;
+    const hudW = 172;
+    const leftRoom = (pos.leftX ?? pos.hpX ?? 180) - 12;
+    if (leftRoom >= hudW + 10) {
+      this.playerHud$.style.left = `${Math.max(8, Math.floor(leftRoom - hudW))}px`;
+      this.playerHud$.style.top = `${Math.max(64, Math.floor((pos.portraitY ?? pos.hpY ?? 420) - 28))}px`;
+      this.playerHud$.style.bottom = 'auto';
+    } else {
+      this.playerHud$.style.left = '8px';
+      this.playerHud$.style.top = 'auto';
+      this.playerHud$.style.bottom = '12px';
+    }
+    this.playerHud$.style.maxWidth = `${hudW}px`;
   }
 
   anchorEnemy(pos) {

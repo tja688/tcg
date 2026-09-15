@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const MAX_ALIVE = 180;
+const MAX_ALIVE = 280;
 const _dir = new THREE.Vector3();
 
 // 轻量精灵粒子池：爆裂、拖尾、星芒、灰烬、治疗光点
@@ -152,6 +152,73 @@ export class ParticleSystem {
         life: life * (0.7 + Math.random() * 0.6),
         size: size * (0.6 + Math.random() * 0.8),
         sizeEnd: 0.01, color, gravity: 0.4, drag: 0.99,
+      });
+    }
+  }
+
+  smoke(pos, {
+    count = 6, color = 0x4a3040, size = 0.46, life = 0.85, speed = 0.7, spread = 0.55,
+  } = {}) {
+    const c = new THREE.Color(color);
+    c.offsetHSL(0, -0.25, -0.22);
+    for (let i = 0; i < count; i++) {
+      this.spawn({
+        pos: new THREE.Vector3(
+          pos.x + (Math.random() - 0.5) * spread * 2,
+          pos.y + Math.random() * 0.25,
+          pos.z + (Math.random() - 0.5) * spread,
+        ),
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.55,
+          speed * (0.35 + Math.random() * 0.7),
+          (Math.random() - 0.5) * 0.55,
+        ),
+        life: life * (0.7 + Math.random() * 0.5),
+        size: size * (0.7 + Math.random() * 0.8),
+        sizeEnd: size * 1.35, color: c, gravity: 0.15, drag: 0.985,
+        opacity: 0.38, blending: THREE.NormalBlending, stretch: 1.15,
+      });
+    }
+  }
+
+  debris(pos, {
+    count = 6, color = 0xffc078, size = 0.16, life = 0.55, speed = 3.2,
+  } = {}) {
+    for (let i = 0; i < count; i++) {
+      _dir.set(
+        (Math.random() - 0.5) * 2,
+        0.35 + Math.random() * 0.9,
+        (Math.random() - 0.5) * 2,
+      ).normalize().multiplyScalar(speed * (0.45 + Math.random() * 0.7));
+      this.spawn({
+        pos,
+        tex: this.assets.sparkTex,
+        vel: _dir.clone(),
+        life: life * (0.65 + Math.random() * 0.5),
+        size: size * (0.55 + Math.random() * 0.8),
+        sizeEnd: 0.02, color, gravity: -9, drag: 0.88, stretch: 1.4,
+      });
+    }
+  }
+
+  wisps(pos, {
+    count = 8, color = 0xffe08a, size = 0.22, life = 0.9, speed = 1.1, spread = 0.7,
+  } = {}) {
+    for (let i = 0; i < count; i++) {
+      this.spawn({
+        pos: new THREE.Vector3(
+          pos.x + (Math.random() - 0.5) * spread * 2,
+          pos.y + (Math.random() - 0.5) * 0.35,
+          pos.z + (Math.random() - 0.5) * spread,
+        ),
+        vel: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.55,
+          speed * (0.4 + Math.random() * 0.8),
+          (Math.random() - 0.5) * 0.55,
+        ),
+        life: life * (0.7 + Math.random() * 0.5),
+        size: size * (0.6 + Math.random() * 0.8),
+        sizeEnd: 0.04, color, gravity: 0.35, drag: 0.97, stretch: 1.6,
       });
     }
   }

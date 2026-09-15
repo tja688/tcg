@@ -3,6 +3,7 @@ import { gsap } from 'gsap';
 import { CFG } from '../config.js';
 import { roundRectPath, drawImageCover } from '../utils/canvasTex.js';
 import { makeCardFaceMaterial } from './cardMaterial.js';
+import { makeMarkMaterial, tintMaterial } from './vfx/materials.js';
 
 const { w: CW, h: CH, texW: TW, texH: TH, radius: R } = CFG.card;
 
@@ -325,11 +326,12 @@ export class CardVisual {
     this.pivot.add(this.glow);
 
     // 战场脚环
-    this.ringMat = new THREE.MeshBasicMaterial({
-      color: CFG.colors.readyRing, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.82, 1.02, 48), this.ringMat);
+    this.ringMat = makeMarkMaterial({ color: CFG.colors.readyRing });
+    this.ringMat.uniforms.uFade.value = 0;
+    this.ringMat.uniforms.uGrown.value = 1.1;
+    this.ringMat.uniforms.uQuadSize.value = 2.2;
+    this.ringMat.uniforms.uRadius.value = 0.96;
+    this.ring = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), this.ringMat);
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.visible = false;
     this.group.add(this.ring);
@@ -385,10 +387,10 @@ export class CardVisual {
     });
   }
 
-  flash(color = 0xfff1d6) {
+  flash(color = 0xf2c48a) {
     this.faceMat.uniforms.uFlashColor.value.setHex(color);
     const u = this.faceMat.uniforms.uFlash;
-    gsap.fromTo(u, { value: 0.95 }, { value: 0, duration: 0.34, ease: 'power2.out', overwrite: 'auto' });
+    gsap.fromTo(u, { value: 0.42 }, { value: 0, duration: 0.3, ease: 'power2.out', overwrite: 'auto' });
   }
 
   recoil(dir = null) {
@@ -431,19 +433,23 @@ export class CardVisual {
   setRing(state) {
     if (this._ringState === state) return;
     this._ringState = state;
-    gsap.killTweensOf(this.ringMat);
+    gsap.killTweensOf(this.ringMat.uniforms.uFade);
     const show = state === 'ready' || state === 'taunt';
     this.ring.visible = show;
     if (state === 'ready') {
-      this.ringMat.color.setHex(CFG.colors.readyRing);
-      this.ringMat.opacity = 0.5;
-      gsap.to(this.ringMat, { opacity: 0.22, duration: 0.8, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+      tintMaterial(this.ringMat, CFG.colors.readyRing);
+      this.ringMat.uniforms.uFade.value = 0.72;
+      gsap.to(this.ringMat.uniforms.uFade, {
+        value: 0.38, duration: 0.8, yoyo: true, repeat: -1, ease: 'sine.inOut',
+      });
     } else if (state === 'taunt') {
-      this.ringMat.color.setHex(CFG.colors.tauntRing);
-      this.ringMat.opacity = 0.4;
-      gsap.to(this.ringMat, { opacity: 0.2, duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+      tintMaterial(this.ringMat, CFG.colors.tauntRing);
+      this.ringMat.uniforms.uFade.value = 0.62;
+      gsap.to(this.ringMat.uniforms.uFade, {
+        value: 0.32, duration: 1.1, yoyo: true, repeat: -1, ease: 'sine.inOut',
+      });
     } else {
-      this.ringMat.opacity = 0;
+      this.ringMat.uniforms.uFade.value = 0;
     }
     gsap.to(this.faceMat.uniforms.uDesat, {
       value: state === 'exhausted' ? 0.5 : 0, duration: 0.4, overwrite: 'auto',
@@ -479,7 +485,7 @@ export class CardVisual {
 
   dispose() {
     gsap.killTweensOf([this.group.position, this.group.rotation, this.group.scale]);
-    gsap.killTweensOf([this.pivot.rotation, this.pivot.position, this.pivot.scale, this.glowMat, this.ringMat]);
+    gsap.killTweensOf([this.pivot.rotation, this.pivot.position, this.pivot.scale, this.glowMat, this.ringMat.uniforms.uFade]);
     this.group.removeFromParent();
     this.faceTex.dispose();
     this.faceMat.dispose();

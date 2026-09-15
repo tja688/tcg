@@ -16,6 +16,9 @@ export const CombatGradeShader = {
     uShockRadius: { value: 0.2 },
     uContrast: { value: 0 },
     uLetterbox: { value: 0 },
+    uTime: { value: 0 },
+    uGrain: { value: 0.028 },
+    uTemperature: { value: 0.06 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -37,18 +40,28 @@ export const CombatGradeShader = {
     uniform float uShockRadius;
     uniform float uContrast;
     uniform float uLetterbox;
+    uniform float uTime;
+    uniform float uGrain;
+    uniform float uTemperature;
     varying vec2 vUv;
+
+    float hash12(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
 
     void main() {
       vec2 c = vec2(0.5, 0.46);
       vec2 dir = vUv - c;
       float dist = length(dir);
       vec2 nd = dist > 1e-4 ? dir / dist : vec2(0.0);
+      float r2 = dot(dir, dir);
 
       float ring = 1.0 - smoothstep(0.0, 0.07, abs(dist - uShockRadius));
       vec2 uv = vUv + nd * ring * uShock * 0.042;
 
-      vec2 ca = dir * uAberration * 0.014;
+      vec2 ca = dir * r2 * uAberration * 0.018 + dir * uAberration * 0.006;
       float r = texture2D(tDiffuse, uv + ca).r;
       float g = texture2D(tDiffuse, uv).g;
       float b = texture2D(tDiffuse, uv - ca).b;
@@ -56,16 +69,23 @@ export const CombatGradeShader = {
 
       col *= smoothstep(1.04, 0.30, dist * uVignette);
       col = mix(vec3(0.5), col, 1.0 + uContrast);
-      float l = dot(col, vec3(0.299, 0.587, 0.114));
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(l), col, uSat) + uLift;
+      col.r += uTemperature * 0.1;
+      col.b -= uTemperature * 0.1;
       col = mix(col, col * uTint, clamp(uTintAmt, 0.0, 1.0));
-      col += vec3(uFlash);
+      col += uFlash * vec3(0.92, 0.78, 0.58);
+
+      if (uGrain > 0.0004) {
+        float grain = hash12(vUv * vec2(1920.0, 1080.0) + fract(uTime) * 137.0) - 0.5;
+        col += grain * uGrain;
+      }
 
       float lb = uLetterbox;
       float mask = step(lb, vUv.y) * step(lb, 1.0 - vUv.y);
       col *= mask;
 
-      gl_FragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(max(col, 0.0), 1.0);
     }
   `,
 };
@@ -89,6 +109,8 @@ export class ScreenFx {
       lift: 0.012,
       bloom: bloom.strength,
       fov: camera.fov,
+      grain: 0.028,
+      temperature: 0.06,
     };
     this.trauma = 0;
     this.kick = new THREE.Vector3();
@@ -113,6 +135,8 @@ export class ScreenFx {
     this.u.uLetterbox.value = 0;
     this.u.uVignette.value = this.base.vignette;
     this.u.uSat.value = this.base.sat;
+    this.u.uGrain.value = this.base.grain;
+    this.u.uTemperature.value = this.base.temperature;
     this.bloom.strength = this.base.bloom;
     this.trauma = 0;
     this.kick.set(0, 0, 0);
@@ -182,7 +206,7 @@ export class ScreenFx {
     duration = 0.32,
   } = {}) {
     if (flash) {
-      gsap.fromTo(this.u.uFlash, { value: flash }, {
+      gsap.fromTo(this.u.uFlash, { value: Math.min(flash, 0.055) }, {
         value: 0, duration: duration * 0.7, ease: 'power2.out', overwrite: 'auto',
       });
     }
@@ -204,7 +228,7 @@ export class ScreenFx {
       });
     }
     if (bloom) {
-      gsap.fromTo(this.bloom, { strength: this.base.bloom + bloom }, {
+      gsap.fromTo(this.bloom, { strength: this.base.bloom + Math.min(bloom, 0.14) }, {
         strength: this.base.bloom, duration, ease: 'power2.out', overwrite: 'auto',
       });
     }
@@ -228,7 +252,7 @@ export class ScreenFx {
     this.u.uTint.value.set(1.15, 0.88, 0.42);
     gsap.to(this.u.uTintAmt, { value: 0.28, duration: 0.4, overwrite: 'auto' });
     gsap.to(this.u.uLetterbox, { value: 0.09, duration: 0.5, overwrite: 'auto' });
-    gsap.to(this.bloom, { strength: this.base.bloom + 0.38, duration: 0.45, overwrite: 'auto' });
+    gsap.to(this.bloom, { strength: this.base.bloom + 0.16, duration: 0.45, overwrite: 'auto' });
     gsap.to(this.u.uSat, { value: 1.22, duration: 0.4, overwrite: 'auto' });
   }
 
@@ -262,6 +286,7 @@ export class ScreenFx {
 
   update(dt) {
     this.time += dt;
+    this.u.uTime.value = this.time;
     this.trauma = decayToward(this.trauma, 0, dt, 0.09);
     this.kick.multiplyScalar(Math.pow(0.0016, dt));
     this.roll = decayToward(this.roll, 0, dt, 0.08);

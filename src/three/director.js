@@ -606,7 +606,7 @@ export class Director {
       this.effects.summonImpact(ts.pos, inst.def.tint || 0x9fd4ff);
       if (inst.def.rarity === 'legendary') {
         this.world.screenFx?.punch({
-          letterbox: 0.06, bloom: 0.24, tint: inst.def.tint || 0xffa726, tintAmt: 0.2,
+          letterbox: 0.04, bloom: 0.1, tint: inst.def.tint || 0xffa726, tintAmt: 0.12,
         });
       }
       v.syncBoardDecor();
@@ -624,7 +624,7 @@ export class Director {
       this.effects.summonImpact(ts.pos, inst.def.tint || 0x9fd4ff);
       if (inst.def.rarity === 'legendary') {
         this.world.screenFx?.punch({
-          letterbox: 0.06, bloom: 0.24, tint: inst.def.tint || 0xffa726, tintAmt: 0.2,
+          letterbox: 0.04, bloom: 0.1, tint: inst.def.tint || 0xffa726, tintAmt: 0.12,
         });
       }
       v.syncBoardDecor();
@@ -675,11 +675,8 @@ export class Director {
         tl.to(v.group.rotation, { x: -0.45, y: 0, z: 0, duration: 0.26 }, 0);
         tl.to(v.group.scale, { x: 1.18, y: 1.18, z: 1, duration: 0.26 }, 0);
         await tl;
-        this.sfx.cue('sfx.spell.prep');
-        this.particles.burst(v.group.position.clone(), {
-          count: 18, speed: 2.8, color: inst.def.tint || 0xb45cff, size: 0.26, life: 0.6, gravity: 0.4,
-        });
-        this.world.screenFx?.punch({ tint: inst.def.tint || 0xb45cff, tintAmt: 0.12, bloom: 0.12 });
+        const tint = inst.def.tint || 0xb45cff;
+        this.effects.flourish(v.group.position.clone(), tint, { cue: 'sfx.spell.prep' });
         const t2 = gsap.timeline();
         t2.to(v.faceMat.uniforms.uOpacity, { value: 0, duration: 0.3 }, 0.05);
         t2.to(v.backMat, { opacity: 0, duration: 0.3 }, 0.05);
@@ -692,11 +689,8 @@ export class Director {
       const v = await this.revealEnemy(null, inst.def, 800);
       const rp = L.revealPos.enemy;
       this.castOrigin.enemy.set(rp[0], rp[1], rp[2]);
-      this.sfx.cue('sfx.spell.prep');
-      this.particles.burst(v.group.position.clone(), {
-        count: 18, speed: 2.8, color: inst.def.tint || 0xb45cff, size: 0.26, life: 0.6, gravity: 0.4,
-      });
-      this.world.screenFx?.punch({ tint: inst.def.tint || 0xb45cff, tintAmt: 0.12, bloom: 0.12 });
+      const tint = inst.def.tint || 0xb45cff;
+      this.effects.flourish(v.group.position.clone(), tint, { cue: 'sfx.spell.prep' });
       const t2 = gsap.timeline();
       t2.to(v.faceMat.uniforms.uOpacity, { value: 0, duration: 0.32 }, 0);
       t2.to(v.backMat, { opacity: 0, duration: 0.32 }, 0);
@@ -739,12 +733,12 @@ export class Director {
     if (entity.kind === 'hero') {
       this.heroVis[entity.side].flashHit();
       this.world.screenFx?.punch({
-        flash: n >= 5 ? 0.16 : 0.07,
-        aberration: n >= 4 ? 0.48 : 0.2,
-        shake: 0.1 + n * 0.026,
-        bleed: entity.side === 'player' ? Math.min(0.88, 0.26 + n * 0.07) : 0,
+        flash: n >= 5 ? 0.045 : 0.02,
+        aberration: n >= 4 ? 0.26 : 0.12,
+        shake: 0.08 + n * 0.018,
+        bleed: entity.side === 'player' ? Math.min(0.62, 0.18 + n * 0.05) : 0,
         tint: 0xff4028,
-        tintAmt: entity.side === 'player' ? 0.14 : 0.06,
+        tintAmt: entity.side === 'player' ? 0.1 : 0.04,
       });
     } else {
       const v = this.vis.get(entity.uid);
@@ -815,7 +809,7 @@ export class Director {
     this.hud.banner(banner, 'enemy');
     this.sfx.cue('flow.intent');
     this.world.screenFx?.punch({
-      letterbox: 0.055, shake: 0.24, vignette: 0.16, tint: 0xff5040, tintAmt: 0.14, bloom: 0.12,
+      letterbox: 0.04, shake: 0.16, vignette: 0.12, tint: 0xff5040, tintAmt: 0.1, bloom: 0.06,
     });
     if (intent) this.syncEnemyHud(intent);
     await sleep(900);
@@ -911,13 +905,18 @@ export class Director {
       this.hud?.anchorPlayerHud?.(null);
       return;
     }
+    vis.portrait.getWorldPosition(this._projA);
+    const center = this.projectWorld(this._projA, this._projB);
+    this._projA.x -= 0.92;
+    const left = this.projectWorld(this._projA, this._projB);
     vis.hpSprite.getWorldPosition(this._projA);
     const hp = this.projectWorld(this._projA, this._projB);
-    this._projA.x += 0.52;
-    const edge = this.projectWorld(this._projA, this._projB);
     this.hud?.anchorPlayerHud?.({
+      portraitX: center.x,
+      portraitY: center.y,
+      leftX: left.x,
       hpX: hp.x,
-      hpR: Math.max(22, Math.abs(edge.x - hp.x)),
+      hpY: hp.y,
     });
   }
 
@@ -932,6 +931,9 @@ export class Director {
     this.dropZone.update(t);
     for (const v of this.vis.values()) {
       v.faceMat.uniforms.uTime.value = t;
+      if (v.ringMat?.uniforms?.uPulse) {
+        v.ringMat.uniforms.uPulse.value = 0.06 + 0.1 * Math.sin(t * 3.1);
+      }
     }
   }
 

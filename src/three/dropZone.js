@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { CFG } from '../config.js';
 import { TextSprite } from '../utils/canvasTex.js';
+import { makeMarkMaterial, tintMaterial } from './vfx/materials.js';
 
 const L = CFG.layout;
 
@@ -14,11 +15,12 @@ export class DropZone {
     this.state = 'hidden';
     this._slot = null;
 
-    this.glowMat = new THREE.MeshBasicMaterial({
-      color: 0x53ffb0, transparent: true, opacity: 0,
-      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    });
-    this.glow = new THREE.Mesh(new THREE.RingGeometry(0.62, 1.08, 48), this.glowMat);
+    this.glowMat = makeMarkMaterial({ color: 0x53ffb0 });
+    this.glowMat.uniforms.uFade.value = 0;
+    this.glowMat.uniforms.uGrown.value = 1.15;
+    this.glowMat.uniforms.uQuadSize.value = 2.35;
+    this.glowMat.uniforms.uRadius.value = 1.02;
+    this.glow = new THREE.Mesh(new THREE.PlaneGeometry(2.35, 2.35), this.glowMat);
     this.glow.rotation.x = -Math.PI / 2;
     this.glow.position.y = L.dropZone.y + 0.02;
     this.glow.renderOrder = 39;
@@ -58,10 +60,10 @@ export class DropZone {
     if (this.state === 'hidden' && !this.group.visible) return;
     this.state = 'hidden';
     this._slot = null;
-    gsap.killTweensOf([this.glowMat, this.ghostMat, this.label.material]);
+    gsap.killTweensOf([this.glowMat.uniforms.uFade, this.ghostMat, this.label.material]);
     this.group.visible = false;
     this.ghost.visible = false;
-    this.glowMat.opacity = 0;
+    this.glowMat.uniforms.uFade.value = 0;
     this.ghostMat.opacity = 0;
     this.label.material.opacity = 0;
   }
@@ -80,7 +82,7 @@ export class DropZone {
     const valid = state === 'valid';
     const cast = state === 'cast';
     const color = valid || cast ? 0x53ffb0 : 0xff6a55;
-    this.glowMat.color.setHex(color);
+    tintMaterial(this.glowMat, color);
     this.label.setText(
       valid ? '放置于此' : '松手施放',
       valid || cast ? '#c8ffe0' : '#ffc4b8',
@@ -100,14 +102,15 @@ export class DropZone {
       this.ghost.visible = false;
     }
 
-    gsap.to(this.glowMat, { opacity: 0.55, duration: 0.1, overwrite: 'auto' });
+    gsap.to(this.glowMat.uniforms.uFade, { value: 0.85, duration: 0.1, overwrite: 'auto' });
     gsap.to(this.label.material, { opacity: 0.92, duration: 0.1, overwrite: 'auto' });
   }
 
   update(t) {
     if (!this.group.visible) return;
-    const base = this.state === 'cast' ? 0.42 : 0.5;
-    this.glowMat.opacity = base + 0.1 * Math.sin(t * 6);
+    const base = this.state === 'cast' ? 0.62 : 0.78;
+    this.glowMat.uniforms.uFade.value = base + 0.12 * Math.sin(t * 6);
+    this.glowMat.uniforms.uPulse.value = 0.08 + 0.1 * Math.sin(t * 4.2);
     this.ghost.position.y = L.minionY + 0.08 + Math.sin(t * 4) * 0.04;
   }
 
