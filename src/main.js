@@ -13,6 +13,7 @@ import { grantRelic } from './run/state.js';
 import { getPseudoAI } from './pseudoai/index.js';
 import { snapshotCombat } from './game/snapshot.js';
 import { CheatPanel } from './ui/cheat.js';
+import { Tutorial } from './ui/tutorial.js';
 
 const errors = [];
 window.addEventListener('error', (e) => errors.push(String(e.message)));
@@ -40,8 +41,9 @@ async function boot() {
   const input = new InputController(world, null, director, hud, sfx);
   input.enabled = false;
 
-  const run = new RunController({ director, input, hud, sfx, assets, seed });
-  const cheat = new CheatPanel(run);
+  const tutorial = new Tutorial({ director, input, hud, sfx });
+  const run = new RunController({ director, input, hud, sfx, assets, seed, tutorial });
+  const cheat = new CheatPanel(run, tutorial);
 
   const resolveT = (sel) => {
     const game = run.game;
@@ -54,7 +56,11 @@ async function boot() {
   };
 
   window.__tcg = {
-    director, world, seed, errors, run, sfx, cheat,
+    director, world, seed, errors, run, sfx, cheat, tutorial,
+    resetTutorial: () => {
+      tutorial.cancelForReset();
+      return true;
+    },
     get game() { return run.game; },
     state() {
       const game = run.game;
@@ -148,6 +154,7 @@ async function boot() {
     world.update(dt);
     particles.update(dt);
     director.update(dt, t);
+    tutorial.update();
     input.update(t);
     world.render();
   }

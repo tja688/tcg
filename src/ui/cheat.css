@@ -139,6 +139,11 @@
   color: #ffedc2;
 }
 
+.cheatResetTut {
+  margin-top: 8px;
+  letter-spacing: 0.18em;
+}
+
 .cheatWin:disabled {
   opacity: 0.4;
   cursor: not-allowed;

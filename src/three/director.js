@@ -236,6 +236,7 @@ export class Director {
     this.scene.add(this.endTurnBtn.group);
 
     this.heroVis = null; // bindGame 后创建
+    this.onPlayerAct = null;
     this._projA = new THREE.Vector3();
     this._projB = new THREE.Vector3();
   }
@@ -317,14 +318,19 @@ export class Director {
   async playerPlay(inst, opts) {
     if (!this.canAct()) return false;
     this.dropZone.hide();
-    return this.run(() => this.game.playCard(inst, opts));
+    const ok = await this.run(() => this.game.playCard(inst, opts));
+    if (ok) this.onPlayerAct?.('play', inst);
+    return ok;
   }
   async playerAttack(attacker, target) {
     if (!this.canAct()) return false;
-    return this.run(() => this.game.attack(attacker, target));
+    const ok = await this.run(() => this.game.attack(attacker, target));
+    if (ok) this.onPlayerAct?.('attack', attacker);
+    return ok;
   }
   async playerEndTurn() {
     if (!this.canAct()) return false;
+    this.onPlayerAct?.('endturn');
     this.endTurnBtn.press();
     this.sfx.cue('ui.confirm');
     return this.run(() => this.game.endTurn('player'));

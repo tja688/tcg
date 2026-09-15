@@ -27,13 +27,14 @@ function veilFor(node) {
 }
 
 export class RunController {
-  constructor({ director, input, hud, sfx, assets, seed }) {
+  constructor({ director, input, hud, sfx, assets, seed, tutorial }) {
     this.director = director;
     this.input = input;
     this.hud = hud;
     this.sfx = sfx;
     this.assets = assets;
     this.seed = seed;
+    this.tutorial = tutorial || null;
     this.rng = mulberry32(seed);
     this.run = null;
     this.game = null;
@@ -60,12 +61,14 @@ export class RunController {
   async beginRun(packId = 'ember') {
     this.rng = mulberry32(this.seed);
     this.run = createRun(this.rng, this.seed, packId);
+    this.tutorial?.armOnRunStart();
     this.hud.refreshRun(this.run);
     await this.showMap();
   }
 
   async showMap() {
     this.input.enabled = false;
+    this.tutorial?.onLeaveCombat();
     detachPseudoAI();
     this.director.teardownCombat();
     this.game = null;
@@ -134,6 +137,7 @@ export class RunController {
     }));
     this.sfx.bgm.setScene(kind === 'boss' ? 'boss' : kind === 'elite' ? 'elite' : 'combat');
     this.hud.refreshRun(this.run);
+    this.tutorial?.onLeaveCombat();
     this.director.teardownCombat();
     const game = new Game(this.director, this.rng, {
       playerHp: this.run.maxHp,
@@ -146,16 +150,20 @@ export class RunController {
     this.game = game;
     this.director.bindGame(game);
     this.input.game = game;
-    this.input.enabled = true;
     const sess = attachPseudoAI({ hud: this.hud, director: this.director, encounter });
     void sess.prepare();
     this.director.combatKind = kind;
     this.director.onCombatEnd = (winner) => this.afterCombat(winner, kind);
+    const hold = this.tutorial?.willStart();
+    this.input.enabled = !hold;
     await this.screens.unveil();
     await this.director.startGame();
+    const started = await this.tutorial?.maybeBegin();
+    if (!started && this.game && !this.game.over) this.input.enabled = true;
   }
 
   async afterCombat(winner, kind) {
+    this.tutorial?.onLeaveCombat();
     this.input.enabled = false;
     if (this.game) {
       this.run.hp = winner === 'player' ? this.run.maxHp : this.game.player.hero.hp;
@@ -280,6 +288,7 @@ export class RunController {
 
   async finishRun(win) {
     this.input.enabled = false;
+    this.tutorial?.onLeaveCombat();
     detachPseudoAI();
     this.director.teardownCombat();
     this.game = null;

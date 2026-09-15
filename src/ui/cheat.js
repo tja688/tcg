@@ -25,8 +25,9 @@ function modeLabel() {
 }
 
 export class CheatPanel {
-  constructor(run) {
+  constructor(run, tutorial) {
     this.run = run;
+    this.tutorial = tutorial || null;
     this.open = false;
     this._syncTimer = null;
     this.root = document.createElement('div');
@@ -52,7 +53,8 @@ export class CheatPanel {
           <button type="submit">改</button>
         </form>
         <button class="cheatWin" type="button" data-act="win">直接获胜</button>
-        <p class="cheatHint">按「、」开关 · 战斗中改当前英雄生命</p>
+        <button class="cheatWin cheatResetTut" type="button" data-act="resetTutorial">重置教程</button>
+        <p class="cheatHint">按「、」开关 · 重置教程后需重开新的一局</p>
       </aside>
     `;
     document.body.appendChild(this.root);
@@ -87,6 +89,7 @@ export class CheatPanel {
       this.applyGold();
     };
     this.win$.onclick = () => this.winNow();
+    this.root.querySelector('[data-act="resetTutorial"]').onclick = () => this.resetTutorial();
   }
 
   toggle() {
@@ -164,6 +167,12 @@ export class CheatPanel {
       return;
     }
     this.run.hud.toast(`金币已改为 ${this.currentGold()}`);
+    this.sync();
+  }
+
+  resetTutorial() {
+    this.tutorial?.cancelForReset();
+    this.run.hud.toast('教程已重置，下一局将重新引导');
     this.sync();
   }
 

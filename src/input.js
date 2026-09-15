@@ -101,6 +101,7 @@ export class InputController {
     this.pendingSlot = null;
     this.willCast = false;
     this.dragArmed = false;
+    this.gate = null;
     this._down = { x: 0, y: 0 };
     this.pointerId = null;
     this.arrowFrom = new THREE.Vector3();
@@ -114,12 +115,15 @@ export class InputController {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') {
         if (this.mode) this.cancelDrag('已收回');
+        else if (this.gate) return;
         else if (this.hud.onSettings) this.hud.onSettings();
         return;
       }
       if (!this.enabled) return;
       if (e.code === 'Space' || e.code === 'Enter') {
         e.preventDefault();
+        const block = this.gateBlock('end');
+        if (block) { this.refuse(block); return; }
         this.director.playerEndTurn();
       }
     });
@@ -154,6 +158,33 @@ export class InputController {
   }
 
   setCursor(c) { this.el.style.cursor = c; }
+
+  setGate(gate) {
+    this.gate = gate || null;
+  }
+
+  gateBlock(kind, inst) {
+    const g = this.gate;
+    if (!g) return null;
+    if (kind === 'end') return g.endTurn ? null : (g.hint || '先看完这一步');
+    if (kind === 'play') {
+      if (!g.play) return g.hint || '先看完这一步';
+      if (g.uids?.length && inst && !g.uids.includes(inst.uid)) return '先打出还亮着的牌';
+      return null;
+    }
+    if (kind === 'attack') {
+      if (!g.attack) return g.hint || '先看完这一步';
+      if (g.uids?.length && inst && !g.uids.includes(inst.uid)) return '先用高亮的随从攻击';
+      return null;
+    }
+    return g.hint || '先看完这一步';
+  }
+
+  refuse(msg) {
+    if (!msg) return;
+    this.hud.toast(msg);
+    this.sfx.error();
+  }
 
   movedEnough(e) {
     const dx = e.clientX - this._down.x;
@@ -394,6 +425,8 @@ export class InputController {
 
     const endHit = this.pick([d.endTurnBtn.mesh]);
     if (endHit) {
+      const block = this.gateBlock('end');
+      if (block) { this.refuse(block); return; }
       if (d.canAct()) d.playerEndTurn();
       else if (this.game.turn === 'enemy') this.hud.toast('对手正在行动…');
       return;
@@ -406,6 +439,8 @@ export class InputController {
 
     const handInst = this.pickHandInst();
     if (handInst) {
+      const gated = this.gateBlock('play', handInst);
+      if (gated) { this.refuse(gated); return; }
       const reason = this.game.playBlockReason(handInst);
       if (reason) {
         this.hud.toast(reason);
@@ -420,6 +455,8 @@ export class InputController {
 
     const bInst = this.pickBoardInst('player');
     if (bInst) {
+      const gated = this.gateBlock('attack', bInst);
+      if (gated) { this.refuse(gated); return; }
       if (!bInst.canAttack || bInst.attack <= 0) {
         if (bInst.attack <= 0) this.hud.toast('这个随从无法攻击');
         else if (bInst.sick) this.hud.toast('随从刚入场，需要休整一回合');
