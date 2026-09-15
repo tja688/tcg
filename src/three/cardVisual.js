@@ -58,6 +58,18 @@ export function paintCardFace(ctx, def, stats, assets) {
   ctx.strokeStyle = 'rgba(214,172,90,0.85)';
   roundRectPath(ctx, 34, nameY, TW - 68, nameH, 16);
   ctx.stroke();
+  // 名牌两端饰钉
+  for (const ex of [34, TW - 34]) {
+    ctx.save();
+    ctx.translate(ex, nameY + nameH / 2);
+    ctx.rotate(Math.PI / 4);
+    const eg = ctx.createLinearGradient(-6, -6, 6, 6);
+    eg.addColorStop(0, '#fff0c0');
+    eg.addColorStop(1, '#8a5f24');
+    ctx.fillStyle = eg;
+    ctx.fillRect(-6.5, -6.5, 13, 13);
+    ctx.restore();
+  }
 
   const nameGrad = ctx.createLinearGradient(0, nameY + 8, 0, nameY + nameH - 8);
   nameGrad.addColorStop(0, '#fff3d8');
@@ -134,11 +146,19 @@ export function paintCardFace(ctx, def, stats, assets) {
   ctx.fillStyle = 'rgba(226,209,168,0.8)';
   ctx.fillText(def.type === 'spell' ? '· 法术 ·' : `· ${def.tribe} ·`, TW / 2, TH - 26);
 
-  // ---- 外框 ----
+  // ---- 外框：按稀有度染色 ----
+  const rarityHex = CFG.colors.rarity[def.rarity] || '#c2c9d6';
   const frame = ctx.createLinearGradient(0, 0, TW, TH);
-  frame.addColorStop(0, '#f4dd9d');
-  frame.addColorStop(0.5, '#966a2f');
-  frame.addColorStop(1, '#e9c87e');
+  if (def.rarity && def.rarity !== 'common') {
+    frame.addColorStop(0, '#f4dd9d');
+    frame.addColorStop(0.38, rarityHex);
+    frame.addColorStop(0.62, '#6a4a20');
+    frame.addColorStop(1, rarityHex);
+  } else {
+    frame.addColorStop(0, '#f4dd9d');
+    frame.addColorStop(0.5, '#966a2f');
+    frame.addColorStop(1, '#e9c87e');
+  }
   ctx.lineWidth = 9;
   ctx.strokeStyle = frame;
   roundRectPath(ctx, 6, 6, TW - 12, TH - 12, R - 4);
@@ -147,6 +167,19 @@ export function paintCardFace(ctx, def, stats, assets) {
   ctx.strokeStyle = 'rgba(255,240,205,0.5)';
   roundRectPath(ctx, 14, 14, TW - 28, TH - 28, R - 10);
   ctx.stroke();
+
+  // 四角金钉
+  for (const [cx, cy] of [[24, 24], [TW - 24, 24], [24, TH - 24], [TW - 24, TH - 24]]) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI / 4);
+    const dg = ctx.createLinearGradient(-7, -7, 7, 7);
+    dg.addColorStop(0, '#fff0c0');
+    dg.addColorStop(1, '#7a5518');
+    ctx.fillStyle = dg;
+    ctx.fillRect(-6, -6, 12, 12);
+    ctx.restore();
+  }
 
   // 传说卡描橙边
   if (def.rarity === 'legendary') {
@@ -173,25 +206,62 @@ export function paintCardFace(ctx, def, stats, assets) {
 }
 
 function drawGem(ctx, x, y, r, [c0, c1, c2], text, fontSize, textColor = '#ffffff') {
-  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.1, x, y, r);
+  // 八角切面宝石：金属托 + 切面线 + 台面高光
+  const oct = (rr) => {
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 4 + Math.PI / 8;
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+  };
+  // 金属托
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  oct(r);
+  const rim = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  rim.addColorStop(0, '#f6e2a8');
+  rim.addColorStop(0.5, '#8a5f24');
+  rim.addColorStop(1, '#e9c87e');
+  ctx.fillStyle = rim;
+  ctx.fill();
+  ctx.restore();
+  // 宝石体
+  oct(r * 0.8);
+  const g = ctx.createRadialGradient(x - r * 0.24, y - r * 0.3, r * 0.08, x, y, r * 0.9);
   g.addColorStop(0, c0);
   g.addColorStop(0.55, c1);
   g.addColorStop(1, c2);
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = g;
-  ctx.shadowColor = 'rgba(0,0,0,0.7)';
-  ctx.shadowBlur = 10;
   ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = 'rgba(240,214,150,0.9)';
+  // 切面
+  ctx.save();
+  oct(r * 0.8);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.26)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 4 + Math.PI / 8;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8);
+    ctx.stroke();
+  }
+  oct(r * 0.38);
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
-  // 高光
+  // 顶部反光
   ctx.beginPath();
-  ctx.ellipse(x - r * 0.22, y - r * 0.4, r * 0.42, r * 0.22, -0.5, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.ellipse(x - r * 0.18, y - r * 0.36, r * 0.34, r * 0.15, -0.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fill();
+  ctx.restore();
 
   ctx.font = `900 ${fontSize}px Georgia, "Microsoft YaHei"`;
   ctx.textAlign = 'center';
@@ -272,6 +342,29 @@ export class CardVisual {
     this.tauntIcon.visible = false;
     this.group.add(this.tauntIcon);
 
+    // 落地接触阴影（软圆斑，让随从“站”在地面上）
+    this.baseShadowMat = new THREE.MeshBasicMaterial({
+      map: assets.glowTex, color: 0x000000, transparent: true, opacity: 0,
+      depthWrite: false,
+    });
+    this.baseShadow = new THREE.Mesh(new THREE.CircleGeometry(1.02, 32), this.baseShadowMat);
+    this.baseShadow.rotation.x = -Math.PI / 2;
+    this.baseShadow.scale.set(1, 0.62, 1);
+    this.baseShadow.renderOrder = 1;
+    this.group.add(this.baseShadow);
+
+    // 阵营地光：我方青蓝、敌方赤红，战场归属一眼可辨
+    const sideColor = inst && inst.side === 'enemy' ? 0xff5a38 : 0x35c8ff;
+    this.baseGlowMat = new THREE.MeshBasicMaterial({
+      map: assets.glowTex, color: sideColor, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.baseGlow = new THREE.Mesh(new THREE.CircleGeometry(1.18, 32), this.baseGlowMat);
+    this.baseGlow.rotation.x = -Math.PI / 2;
+    this.baseGlow.scale.set(1, 0.68, 1);
+    this.baseGlow.renderOrder = 2;
+    this.group.add(this.baseGlow);
+
     this._ringState = 'hidden';
     this._glowState = 'none';
 
@@ -326,9 +419,9 @@ export class CardVisual {
     } else {
       const color = state === 'playable' ? CFG.colors.playableGlow : CFG.colors.targetGlow;
       this.glowMat.color.setHex(color);
-      gsap.to(this.glowMat, { opacity: 0.55, duration: 0.3, overwrite: 'auto' });
+      gsap.to(this.glowMat, { opacity: 0.42, duration: 0.3, overwrite: 'auto' });
       gsap.to(this.glowMat, {
-        opacity: 0.32, duration: 0.85, yoyo: true, repeat: -1, delay: 0.3, ease: 'sine.inOut',
+        opacity: 0.22, duration: 0.85, yoyo: true, repeat: -1, delay: 0.3, ease: 'sine.inOut',
       });
     }
   }
@@ -358,10 +451,15 @@ export class CardVisual {
   }
 
   syncBoardDecor() {
-    // 站立于战场时：脚环放到卡牌底部地面，盾徽悬于底缘
+    // 站立于战场时：脚环放到卡牌底部地面，盾徽悬于底缘，脚下落影与阵营地光
     this.ring.position.set(0, -CFG.layout.minionY + 0.03, 0.42);
     this.tauntIcon.position.set(0, -CFG.layout.minionY + 0.62, 0.75);
     this.tauntIcon.visible = !!(this.inst && this.inst.taunt && this.inst.onBoard);
+    this.baseShadow.position.set(0, -CFG.layout.minionY + 0.02, 0.42);
+    this.baseGlow.position.set(0, -CFG.layout.minionY + 0.028, 0.42);
+    const onBoard = !!(this.inst && this.inst.onBoard);
+    gsap.to(this.baseShadowMat, { opacity: onBoard ? 0.55 : 0, duration: 0.3, overwrite: 'auto' });
+    gsap.to(this.baseGlowMat, { opacity: onBoard ? 0.3 : 0, duration: 0.3, overwrite: 'auto' });
   }
 
   setRenderOrder(n) {
@@ -388,5 +486,7 @@ export class CardVisual {
     this.backMat.dispose();
     this.glowMat.dispose();
     this.ringMat.dispose();
+    this.baseShadowMat.dispose();
+    this.baseGlowMat.dispose();
   }
 }

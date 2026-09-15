@@ -3,7 +3,7 @@ export const CFG = {
   card: { w: 1.9, h: 2.66, texW: 512, texH: 716, radius: 34 },
 
   layout: {
-    handY: 3.42, handZ: 6.18,
+    handY: 3.55, handZ: 6.18,
     enemyHandY: 2.35, enemyHandZ: -7.55,
     rowZ: { player: 1.95, enemy: -1.72 },
     minionY: 1.3,          // 站立卡牌中心高度

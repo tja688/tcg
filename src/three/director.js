@@ -29,31 +29,122 @@ class DeckStack {
       this.group.add(m);
       this.layers.push(m);
     }
-    this.count = new TextSprite({
-      text: '30', font: '700 84px Georgia, "Microsoft YaHei"', color: '#cfd8ff',
-      canvasW: 256, canvasH: 128, worldH: 0.5, strokeWidth: 8,
-    });
-    this.count.sprite.position.set(0, 0.85, 0);
-    this.group.add(this.count.sprite);
+    this.countCanvas = document.createElement('canvas');
+    this.countCanvas.width = 256;
+    this.countCanvas.height = 128;
+    this.countTex = new THREE.CanvasTexture(this.countCanvas);
+    this.countTex.colorSpace = THREE.SRGBColorSpace;
+    this.count = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: this.countTex, transparent: true, depthWrite: false,
+    }));
+    this.count.scale.set(1.15, 0.58, 1);
+    this.count.position.set(0, 0.85, 0);
+    this.group.add(this.count);
+    this._countN = -1;
   }
   setCount(n) {
     const vis = Math.min(6, Math.ceil(n / 5));
     this.layers.forEach((m, i) => { m.visible = i < vis; });
-    this.count.setText(String(n), n === 0 ? '#5a5470' : undefined);
+    if (n === this._countN) return;
+    this._countN = n;
+    // 徽章式计数牌：深色底板 + 金边 + 数字
+    const ctx = this.countCanvas.getContext('2d');
+    ctx.clearRect(0, 0, 256, 128);
+    const x = 58, y = 22, w = 140, h = 84;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 18);
+    const bg = ctx.createLinearGradient(0, y, 0, y + h);
+    bg.addColorStop(0, 'rgba(24,18,40,0.92)');
+    bg.addColorStop(1, 'rgba(10,8,20,0.92)');
+    ctx.fillStyle = bg;
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 4;
+    const eg = ctx.createLinearGradient(x, y, x + w, y + h);
+    eg.addColorStop(0, '#f4dd9d');
+    eg.addColorStop(1, '#8a5f24');
+    ctx.strokeStyle = eg;
+    ctx.stroke();
+    ctx.font = '800 56px Georgia, "Microsoft YaHei"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(10,6,14,0.9)';
+    ctx.strokeText(String(n), 128, 68);
+    ctx.fillStyle = n === 0 ? '#5a5470' : '#e8ecff';
+    ctx.fillText(String(n), 128, 68);
+    this.countTex.needsUpdate = true;
   }
 }
 
 // ---------- 结束回合按钮 ----------
+function makeEndTurnFaceTex() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const ctx = c.getContext('2d');
+  const C = 128;
+  // 青铜盘面
+  const bg = ctx.createRadialGradient(C - 20, C - 24, 10, C, C, 128);
+  bg.addColorStop(0, '#a87f3c');
+  bg.addColorStop(0.6, '#6e4f20');
+  bg.addColorStop(1, '#3d2a0e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 256, 256);
+  // 刻环
+  for (const r of [104, 82]) {
+    ctx.beginPath();
+    ctx.arc(C, C, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(40,26,8,0.75)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(C, C, r - 3, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,230,170,0.35)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  // 刻度
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(C + Math.cos(a) * 86, C + Math.sin(a) * 86);
+    ctx.lineTo(C + Math.cos(a) * 100, C + Math.sin(a) * 100);
+    ctx.strokeStyle = 'rgba(30,20,6,0.8)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+  }
+  // 中央沙漏符印
+  ctx.beginPath();
+  ctx.moveTo(C - 30, C - 44); ctx.lineTo(C + 30, C - 44); ctx.lineTo(C, C); ctx.closePath();
+  ctx.moveTo(C - 30, C + 44); ctx.lineTo(C + 30, C + 44); ctx.lineTo(C, C); ctx.closePath();
+  const hg = ctx.createLinearGradient(C - 30, C - 44, C + 30, C + 44);
+  hg.addColorStop(0, '#ffe9ad');
+  hg.addColorStop(1, '#c8922e');
+  ctx.fillStyle = hg;
+  ctx.shadowColor = 'rgba(255,210,120,0.7)';
+  ctx.shadowBlur = 12;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 class EndTurnButton {
   constructor() {
     this.group = new THREE.Group();
     this.group.position.fromArray(L.endTurnPos);
+    const sideMat = new THREE.MeshStandardMaterial({
+      color: 0x4a3416, metalness: 0.9, roughness: 0.4,
+    });
     this.mat = new THREE.MeshStandardMaterial({
-      color: 0x6b5326, metalness: 0.9, roughness: 0.35,
+      map: makeEndTurnFaceTex(), metalness: 0.85, roughness: 0.3,
       emissive: 0xff9d2e, emissiveIntensity: 0.0,
     });
     // 六边形符印 + 金色包边
-    this.mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.74, 0.16, 6), this.mat);
+    this.mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.74, 0.16, 6), [sideMat, this.mat, sideMat]);
     this.mesh.castShadow = true;
     this.mesh.userData.endTurn = true;
     this.group.add(this.mesh);

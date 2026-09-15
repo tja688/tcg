@@ -22,8 +22,9 @@ const BACKDROP_TEX_KEYS = [
 function prepBackdropTex(tex) {
   if (!tex) return null;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.repeat.set(1, 0.62);
-  tex.offset.set(0, 0.16);
+  // 只取画面上半段天空带，底部黑色山峦留给雾
+  tex.repeat.set(1, 0.55);
+  tex.offset.set(0, 0.34);
   return tex;
 }
 
@@ -44,8 +45,8 @@ export function createWorld(container, assets) {
 
   // ---- 相机（camPos 供动画驱动，shake 独立叠加）----
   const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
-  const camPos = { x: 0, y: 13.2, z: 12.2 };
-  const camTarget = new THREE.Vector3(0, 0.75, -1.15);
+  const camPos = { x: 0, y: 13.55, z: 12.35 };
+  const camTarget = new THREE.Vector3(0, 0.98, -0.15);
   const rig = new THREE.Group();
   rig.add(camera);
   scene.add(rig);
@@ -124,8 +125,8 @@ export function createWorld(container, assets) {
         addBackdropFadeY(new THREE.PlaneGeometry(96, 34)),
         new THREE.MeshBasicMaterial({ map: startTex, fog: false, depthWrite: false }),
       );
-      backdropMesh.material.color.setRGB(0.94, 0.9, 0.84);
-      backdropMesh.position.set(0, 3.4, -17.2);
+      backdropMesh.material.color.setRGB(0.98, 0.95, 0.9);
+      backdropMesh.position.set(0, 4.6, -17.2);
       backdropMesh.rotation.x = -0.2;
       backdropMesh.renderOrder = -10;
       bindBackdropAbyssFade(backdropMesh, ARENA_ENVS.dusk);
@@ -201,23 +202,25 @@ export function createWorld(container, assets) {
 
   const abyss = createAbyssLayer(scene, assets);
 
-  // ---- 篝火火焰粒子（两座）----
+  // ---- 篝火火焰粒子（两座）：细密粒子 + 按高度变色（根部亮白→焰尖暗红）----
   const flames = [];
   for (const sx of [-1, 1]) {
-    const n = 30;
+    const n = 64;
     const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
     const seed = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       seed[i] = Math.random();
-      pos[i * 3] = sx * 7.6 + (Math.random() - 0.5) * 0.34;
-      pos[i * 3 + 1] = 0.85 + Math.random() * 1.1;
-      pos[i * 3 + 2] = -3.0 + (Math.random() - 0.5) * 0.34;
+      pos[i * 3] = sx * 7.6 + (Math.random() - 0.5) * 0.3;
+      pos[i * 3 + 1] = 0.8 + Math.random() * 1.25;
+      pos[i * 3 + 2] = -3.0 + (Math.random() - 0.5) * 0.3;
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     const f = new THREE.Points(g, new THREE.PointsMaterial({
-      map: assets.glowTex, color: 0xff7a2a, size: 0.5, transparent: true, opacity: 0.75,
-      blending: THREE.AdditiveBlending, depthWrite: false,
+      map: assets.glowTex, size: 0.34, transparent: true, opacity: 0.85,
+      vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     f.userData = { sx, seed };
     scene.add(f);
@@ -377,24 +380,31 @@ export function createWorld(container, assets) {
         p.needsUpdate = true;
       }
 
-      // 火焰
+      // 火焰：上升、收拢、按高度从亮白过渡到暗红
       for (const f of flames) {
         const p = f.geometry.attributes.position;
+        const ca = f.geometry.attributes.color;
         const seed = f.userData.seed;
+        const cx = f.userData.sx * 7.6;
         for (let i = 0; i < seed.length; i++) {
-          let y = p.getY(i) + dt * (1.2 + seed[i] * 0.9);
-          if (y > 1.95) {
+          let y = p.getY(i) + dt * (1.1 + seed[i] * 1.0);
+          if (y > 2.1) {
             y = 0.8;
-            p.setX(i, f.userData.sx * 7.6 + (Math.random() - 0.5) * 0.34);
-            p.setZ(i, -3.0 + (Math.random() - 0.5) * 0.34);
+            p.setX(i, cx + (Math.random() - 0.5) * 0.3);
+            p.setZ(i, -3.0 + (Math.random() - 0.5) * 0.3);
           }
           p.setY(i, y);
           // 越高越向中心收拢
-          const k = (y - 0.8) / 1.15;
-          const cx = f.userData.sx * 7.6;
+          const k = Math.min(1, (y - 0.8) / 1.3);
           p.setX(i, cx + (p.getX(i) - cx) * (1 - dt * k * 2.2));
+          // 颜色 ramp：根 1.0,0.98,0.85 → 中 1.0,0.55,0.25 → 尖 0.5,0.12,0.06
+          const cr = 1.0 - k * 0.5;
+          const cg = 0.98 - k * 0.86;
+          const cb = 0.85 - k * 0.79;
+          ca.setXYZ(i, cr, cg, cb);
         }
         p.needsUpdate = true;
+        ca.needsUpdate = true;
       }
     },
     render() { composer.render(); },
