@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>奥术对决 · 核心玩法与算法说明</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 封面 -->
+<section class="page cover">
+  <div class="art"><img src="assets/shot_boss.jpg" alt=""></div>
+  <div class="brand"><span>“智影未来 · 艺创无界” 国际创新创业创意挑战赛</span><span>AI 游戏电竞赛道</span></div>
+  <div class="body">
+    <div class="eyebrow">技术文档 I · GAMEPLAY &amp; ALGORITHMS</div>
+    <h1>核心玩法与<br>算法说明</h1>
+    <div class="sub">奥术对决 · Arcane Duel —— 规则、预兆系统、本地大模型驱动的对手决策与台词生成</div>
+    <p class="lead" style="max-width:150mm">本文档面向评审与技术读者，说明《奥术对决》的玩法结构与规则数值、敌方“智能对战体”的完整决策链路（局面序列化 → 合法动作枚举 → 启发式评估 → 大模型决策 → 校验执行 → 人格化表达），以及用于验证这些机制的模拟器与测试脚本。</p>
+    <div class="meta">
+      <div>文档版本<b>v1.0 · 2026-09</b></div>
+      <div>对应构建<b>ArcaneDuel 0.1.0 · Qwen3.5-2B</b></div>
+      <div>阅读时长<b>约 20 分钟</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- 目录 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>目录</span></div>
+  <div class="kicker">CONTENTS</div>
+  <h2>目录</h2>
+  <ol class="toc">
+    <li><span class="n">01</span><span>玩法总览：远征循环与节点</span><span class="dots"></span><span class="pg">03</span></li>
+    <li><span class="n">02</span><span>战斗规则与数值体系</span><span class="dots"></span><span class="pg">04</span></li>
+    <li><span class="n">03</span><span>预兆系统：可读的敌意</span><span class="dots"></span><span class="pg">05</span></li>
+    <li><span class="n">04</span><span>对手认知引擎 ①：架构与决策循环</span><span class="dots"></span><span class="pg">06</span></li>
+    <li><span class="n">05</span><span>对手认知引擎 ②：候选评估与大模型决策</span><span class="dots"></span><span class="pg">07</span></li>
+    <li><span class="n">06</span><span>对手认知引擎 ③：人格、校验与降级</span><span class="dots"></span><span class="pg">08</span></li>
+    <li><span class="n">07</span><span>台词生成：事件驱动的人格化表达</span><span class="dots"></span><span class="pg">09</span></li>
+    <li><span class="n">08</span><span>远征层算法：地图、经济与随机性</span><span class="dots"></span><span class="pg">10</span></li>
+    <li><span class="n">09</span><span>验证：模拟器、自动化测试与实测数据</span><span class="dots"></span><span class="pg">11</span></li>
+  </ol>
+
+  <hr class="orn">
+  <div class="grid g2">
+    <div class="panel">
+      <span class="kicker">术语约定</span>
+      <table class="compact">
+        <tr><th>术语</th><th>含义</th></tr>
+        <tr><td>远征 Run</td><td>一局完整游戏：从选卡包到击败首领或阵亡</td></tr>
+        <tr><td>遭遇 Encounter</td><td>一位敌人的定义：名字、血量、牌库、预兆表、人格</td></tr>
+        <tr><td>预兆 Intent</td><td>敌人在玩家回合开始时公开的下一步英雄行动</td></tr>
+        <tr><td>候选 Candidate</td><td>规则引擎枚举出的一条合法动作及其启发式分数</td></tr>
+        <tr><td>决策 Decision</td><td>大模型在候选集合中做出的选择及其理由</td></tr>
+        <tr><td>人格 Persona</td><td>敌人的说话方式与决策偏好档案</td></tr>
+        <tr><td>侧车 Sidecar</td><td>随游戏一起启动的本地推理进程（llama-server）</td></tr>
+      </table>
+    </div>
+    <div class="panel">
+      <span class="kicker">代码位置速查</span>
+      <table class="compact">
+        <tr><th>模块</th><th>职责</th></tr>
+        <tr><td><code>src/game/game.js</code></td><td>战斗规则、状态变更、胜负判定</td></tr>
+        <tr><td><code>src/game/intent.js</code></td><td>预兆表匹配与生成</td></tr>
+        <tr><td><code>src/pseudoai/brain.js</code></td><td>敌方回合执行循环</td></tr>
+        <tr><td><code>src/pseudoai/tactics.js</code></td><td>候选枚举、启发式评分、计划预览</td></tr>
+        <tr><td><code>src/pseudoai/voice.js</code></td><td>提示词构建、输出净化</td></tr>
+        <tr><td><code>src/pseudoai/llm.js</code></td><td>本地推理网关、超时与探活</td></tr>
+        <tr><td><code>src/pseudoai/banter.js</code></td><td>台词调度：冷却、概率、优先级</td></tr>
+        <tr><td><code>src/pseudoai/personas.js</code></td><td>11 位敌人的人格档案</td></tr>
+        <tr><td><code>src/run/*</code></td><td>地图、卡包、商店、事件、遗物、奖励</td></tr>
+        <tr><td><code>src/sim/*</code> · <code>scripts/*</code></td><td>无渲染模拟器与回归测试</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 01 玩法总览 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>01 · 玩法总览</span></div>
+  <div class="kicker">01 · 玩法总览</div>
+  <h2>远征循环与节点</h2>
+  <p>《奥术对决》把精简的 TCG 战斗规则叠在一段 14 层的 Roguelike 远征上。玩家每一局都在“扩张牌库 / 保存生命 / 积累金币与遗物”之间做取舍，最终在第 14 层面对三阶段首领“深渊魔王”。</p>
+
+  <div class="flow mt2">
+    <div class="node hi"><span class="t">选卡包</span><span class="d">三选一 · 核心 10 + 主题池抽 4</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="t">读地图</span><span class="d">同层多选一 · 选定即锁死同层</span></div>
+    <div class="arrow">→</div>
+    <div class="node ai"><span class="t">进入节点</span><span class="d">战斗 / 事件 / 商店 / 篝火 / 宝藏</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="t">结算</span><span class="d">金币 · 三选一卡牌 · 遗物</span></div>
+    <div class="arrow">→</div>
+    <div class="node ok"><span class="t">首领</span><span class="d">第 14 层 · 三阶段</span></div>
+  </div>
+
+  <h3>节点类型</h3>
+  <table class="compact">
+    <tr><th>节点</th><th>触发内容</th><th>收益 / 代价</th><th>层分布</th></tr>
+    <tr><td>战斗</td><td>随机普通敌人（前 5 层早期池，第 6 层起加入中层池）</td><td>18–24 金 · 三选一卡牌</td><td>1–12 层</td></tr>
+    <tr><td>精英</td><td>三位精英之一，血量 22–28，起手更多</td><td>28–38 金 · 卡牌 · 必掉遗物</td><td>第 6、10 层</td></tr>
+    <tr><td>事件</td><td>9 种文本事件，选项含赌博、交易、删牌、遭遇战</td><td>金币 / 生命 / 上限 / 卡牌 / 遗物</td><td>2、3、5、7、12 层</td></tr>
+    <tr><td>商店</td><td>3 张牌（按稀有度定价 42–90）、1 件遗物（160）、删牌（75）、刷新（25）</td><td>花金币精炼牌库</td><td>4、9、11 层</td></tr>
+    <tr><td>篝火</td><td>休整</td><td>生命上限 +6（持“铁杯”+9）</td><td>7、11、13 层</td></tr>
+    <tr><td>宝藏</td><td>开匣</td><td>28–43 金 · 一件遗物</td><td>第 9 层</td></tr>
+    <tr><td>首领</td><td>深渊魔王 · 28 血 · 三阶段</td><td>通关</td><td>第 14 层</td></tr>
+  </table>
+
+  <div class="grid g3 mt2">
+    <div class="panel tint-orange">
+      <span class="kicker">余烬先锋 · 快攻</span>
+      <p class="small" style="margin:0">冲锋与直伤抢节奏，打脸比控场重要。核心：烬火斥候、焰冢猎犬、雷霆武士、烈焰火球。主题池含流星碎片、夜刃等高爆发牌。</p>
+    </div>
+    <div class="panel tint-cyan">
+      <span class="kicker">晶壁守望 · 嘲讽护甲</span>
+      <p class="small" style="margin:0">把路堵死、把血换厚。核心：青苔盾龟、守望牧师、圣所、黎明圣骑、银辉牧师（吸血）。以护甲与治疗把对局拖入后期。</p>
+    </div>
+    <div class="panel tint-purple">
+      <span class="kicker">裂隙织法 · 法术过牌</span>
+      <p class="small" style="margin:0">用虹吸与回声换资源，场面可以空、手牌不能空。核心：虚空虹吸、回声法师、熔火迸裂、奥术智慧。上限高、容错低。</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p class="small" style="margin:0"><strong>设计意图。</strong>三套卡包对应三种“对手需要读懂的玩家风格”。敌人认知引擎会读取玩家卡包原型（<code>playerArchetype</code>）作为局面理解的一部分——面对快攻会更早铺嘲讽，面对控制会更倾向直伤面门。玩家的选择因此不仅改变自己的牌，也改变对手的思路。</p>
+  </div>
+  <figure class="framed mt1"><img src="assets/shot_map.jpg" alt="" style="height:52mm;object-fit:cover;object-position:center 30%"><figcaption><b>远征地图</b> · 14 层节点以脊线随机漫步 + 无交叉松弛布置；同层多选一，选定后同层其余节点锁死。已探索路径以金色高亮。</figcaption></figure>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 02 战斗规则 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>02 · 战斗规则</span></div>
+  <div class="kicker">02 · 战斗规则与数值体系</div>
+  <h2>一套刻意精简、便于模型理解的规则</h2>
+  <p>战斗规则以“任何一个局面都能用二十行文字完整描述”为目标设计。规则越可序列化，模型对局面的理解就越可靠；同时精简规则也让预兆、台词与玩家推理三者能够对齐。</p>
+
+  <div class="grid g-1-2">
+    <div>
+      <table class="compact">
+        <tr><th>项目</th><th>数值</th></tr>
+        <tr><td>玩家英雄生命</td><td>40（远征中可提升上限）</td></tr>
+        <tr><td>敌人生命</td><td>16–28，按遭遇定义</td></tr>
+        <tr><td>起手手牌</td><td>玩家 4 · 敌人 3–4</td></tr>
+        <tr><td>法力</td><td>每回合 +1，上限 10，回合开始回满</td></tr>
+        <tr><td>抽牌</td><td>每回合开始 1 张</td></tr>
+        <tr><td>战场上限</td><td>6 个随从 / 方</td></tr>
+        <tr><td>手牌上限</td><td>10 张，超出焚毁</td></tr>
+        <tr><td>疲劳</td><td>牌库抽空后每次抽牌递增 1 点伤害</td></tr>
+        <tr><td>先手</td><td>玩家先手；同时击倒判玩家胜</td></tr>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin-top:0">关键字与效果</h4>
+      <table class="compact">
+        <tr><th>类别</th><th>效果</th><th>规则</th></tr>
+        <tr><td rowspan="3">关键字</td><td>嘲讽</td><td>敌方随从攻击必须先打嘲讽；法术与预兆不受限</td></tr>
+        <tr><td>冲锋</td><td>入场当回合即可攻击</td></tr>
+        <tr><td>吸血</td><td>造成伤害时为英雄回复等量生命</td></tr>
+        <tr><td rowspan="2">随从触发</td><td>战吼</td><td>抽牌 / 敌方全体伤害 / 打脸 / 治疗 / 护甲 / 召唤</td></tr>
+        <tr><td>亡语</td><td>抽牌 / 召唤 / 打脸</td></tr>
+        <tr><td rowspan="3">法术</td><td>指向</td><td>伤害、治疗、+攻、−攻，目标由 <code>spell.target</code> 限定</td></tr>
+        <tr><td>无目标</td><td>群体伤害、抽牌、护甲、召唤</td></tr>
+        <tr><td>虹吸</td><td>对敌方英雄伤害并回复自身</td></tr>
+        <tr><td>护甲</td><td>—</td><td>先于生命扣除；护甲不回复</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>回合流程与状态机</h3>
+  <div class="flow">
+    <div class="node"><span class="t">回合开始</span><span class="d">法力 +1 回满 · 随从解除召唤失调 · 抽 1</span></div>
+    <div class="arrow">→</div>
+    <div class="node hi"><span class="t">玩家阶段</span><span class="d">敌人显露预兆 · 玩家出牌 / 攻击 · 空格结束</span></div>
+    <div class="arrow">→</div>
+    <div class="node ai"><span class="t">敌人阶段</span><span class="d">先结算预兆 · 再由认知引擎出牌与攻击</span></div>
+    <div class="arrow">→</div>
+    <div class="node"><span class="t">结算</span><span class="d">死亡 → 亡语 → 阶段变化 → 胜负</span></div>
+  </div>
+  <p class="small mt2">规则层 <code>Game</code> 只修改数据并 <code>await this.fx.*</code> 通知表现层；表现层 <code>Director</code> 不持有任何规则。这种单向依赖使得同一套规则可以在浏览器（有渲染）与 Node 模拟器（<code>fxStub</code> 空实现）中运行同一份代码，是后文“验证”一节的基础。</p>
+
+  <div class="grid g2 mt1">
+    <figure class="framed"><img src="assets/shot_targeting.jpg" alt=""><figcaption><b>拖线指向</b> · 指向性法术与攻击均以拖线选择目标，非法目标不高亮；悬停时显示伤害预演（含护甲吸收与是否斩杀）。</figcaption></figure>
+    <div class="panel">
+      <span class="kicker">数值设计原则</span>
+      <ul class="small" style="margin:0">
+        <li><strong>费用 ≈ 攻 + 0.8×血 的线性曲线</strong>，关键字与触发效果以 1–2 费为溢价。这条曲线同时被候选评估器复用（见 05 节），保证“模型看到的价值”与“玩家感受到的价值”一致。</li>
+        <li><strong>敌人生命偏低（16–28）但拥有预兆</strong>：预兆是敌人每回合免费的英雄行动，弥补其牌库偏弱的不足，也把博弈重心从“数值对拼”转向“读意图”。</li>
+        <li><strong>玩家先手且同时击倒判胜</strong>，配合 40 血底子，让新手在前几层有充足容错，难度主要由精英与首领提供。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 03 预兆 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>03 · 预兆系统</span></div>
+  <div class="kicker">03 · 预兆系统</div>
+  <h2>可读的敌意：把“猜心”做成玩法</h2>
+  <p>每当玩家回合开始，敌人会锁定并公开一条<strong>预兆</strong>——攻击 N、护甲 N、全体强化、削弱你的随从、召唤援军或特殊技（群伤 / 抽牌 / 治疗）。预兆在敌人回合开始时先于出牌结算。它是敌人“英雄技能”的可视化形式，也是认知引擎与台词系统共享的公开信息。</p>
+
+  <div class="grid g-3-2">
+    <div>
+      <h4 style="margin-top:0">预兆表的两层结构</h4>
+      <p class="small">每位敌人的预兆表由若干<em>阶段</em>组成，每个阶段包含一组<strong>条件规则</strong>与一个<strong>循环序列</strong>。生成时先按顺序匹配规则（首个命中即返回），否则按回合数取循环序列。首领会随生命阈值切换阶段，横幅提示形态变化。</p>
+<pre><code>crystal_warden.phases[0] = {
+  cycle: [ 晶壁 +2 甲, 再凝 +2 甲, 晶刺反击 2 ],
+  rules: [
+    { if: { pThreatGte: 8 },  intent: 全力守御 +5 甲 },
+    { if: { hpBelow: 0.35 },  intent: 残晶护体 +6 甲 },
+  ],
+}
+// 条件字段：hpBelow / playerHpBelow / pThreatGte /
+//   eBoardLte / pBoardGte / turnGte / phase ...</code></pre>
+      <p class="small">条件字段全部来自可公开的局面量（血量比例、场面攻击总和、回合数……），因此玩家<strong>原则上可以推理出敌人下一步</strong>，而认知引擎在“思考台词”里会有意漏出对预兆的解释，形成三方对齐。</p>
+      <p class="small"><strong>预兆不由模型决定</strong>，而是确定性规则——这保证了首领战的节奏可设计、可预期。模型负责预兆之外的全部自由度：出哪些牌、打谁、什么时候不出。两者叠加后，敌人既有“剧本感”又有“临场感”。</p>
+    </div>
+    <div>
+      <div class="panel tint-purple">
+        <span class="kicker">深渊魔王 · 三阶段</span>
+        <div class="timeline mt1">
+          <div class="ev"><div class="when">28 → 26 血 · 第一形态</div><b>召军守势</b><div class="small muted">深渊幼崽 → 深渊甲 3 → 魔爪 2；场空则补裂隙小鬼</div></div>
+          <div class="ev"><div class="when">≤ 26 血 · 第二形态 · 深渊睁眼</div><b>强化清场</b><div class="small muted">魔核 +1 力量 → 深渊波 2 → 灭世挥击 4；你场上 ≥3 随从时优先深渊波</div></div>
+          <div class="ev"><div class="when">≤ 12 血 · 终焉形态 · 魔王咆哮</div><b>终焉咆哮</b><div class="small muted">终焉 4 → 灭世吐息 2 → 咆哮 5；你 &lt;10 血时处刑咆哮 6</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>11 位敌人一览</h3>
+  <table class="compact">
+    <tr><th>敌人</th><th>层级</th><th>血</th><th>原型</th><th>预兆循环特征</th><th>人格声线</th></tr>
+    <tr><td>灰烬掠夺者</td><td>普通</td><td class="num">18</td><td>aggro</td><td>斩 2 → 召余烬幼崽 → 斩 3；你 &lt;8 血时斩 4</td><td>急性子，催你出牌</td></tr>
+    <tr><td>水晶守望者</td><td>普通</td><td class="num">16</td><td>tank</td><td>叠甲 2 → 叠甲 2 → 反击 2；威胁 ≥8 时叠 5</td><td>沉稳，偶尔倒装</td></tr>
+    <tr><td>毒瘴术士</td><td>普通</td><td class="num">20</td><td>status</td><td>−2 攻 → 瘴气 2 → −1 攻；你 ≥3 随从时毒爆</td><td>带笑损人</td></tr>
+    <tr><td>战鼓蛮兵</td><td>普通</td><td class="num">16</td><td>buff</td><td>力量 +1 → 召鼓手 → 猛击 2</td><td>大嗓门</td></tr>
+    <tr><td>虚空织法者</td><td>中层</td><td class="num">24</td><td>control</td><td>抽 1 → 帷幕 4 甲 → 裂空群伤 2</td><td>慢条斯理，漏下一步</td></tr>
+    <tr><td>雷霆先锋</td><td>中层</td><td class="num">18</td><td>tempo</td><td>突击 2 → 雷纹 +1 → 连斩 2；6 回合后齐射 4</td><td>干脆、语速快</td></tr>
+    <tr><td>暮刃刺客长</td><td>精英</td><td class="num">28</td><td>elite_aggro</td><td>暮刃 3 → 连刺 3 → 影嗣 → 处刑 4；你 &lt;12 血时斩首 6</td><td>轻声嘲讽</td></tr>
+    <tr><td>圣堂壁垒</td><td>精英</td><td class="num">28</td><td>elite_tank</td><td>圣壁 4 → 再铸 3 → 盾击 3 → 召石卫；≤40% 血圣愈 6</td><td>短而稳，像立誓</td></tr>
+    <tr><td>腐化龙嗣</td><td>精英</td><td class="num">22</td><td>elite_buff</td><td>龙血 +1 → 幼息群伤 1 → 撕咬 3；6 回合后龙息 2</td><td>幼龙，句尾“咯咯”</td></tr>
+    <tr><td>深渊魔王</td><td>首领</td><td class="num">28</td><td>boss</td><td>三阶段，见上</td><td>傲慢，偶尔夹英文</td></tr>
+    <tr><td>伏击影魔</td><td>事件遭遇</td><td class="num">16</td><td>aggro</td><td>偷袭 2 → 影嗣 → 补刀 3</td><td>小声，从暗处探头</td></tr>
+  </table>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 04 认知引擎 ① -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>04 · 对手认知引擎 ①</span></div>
+  <div class="kicker">04 · 对手认知引擎 ①</div>
+  <h2>架构与决策循环</h2>
+  <p>对手认知引擎（Opponent Mind）是本作的核心。它让本地大模型在规则引擎划定的合法边界内，为每一位敌人做出<strong>带人格的战术决策</strong>，并用同一份“内心状态”生成台词。一句话概括：<em>规则给边界、启发式给候选、模型给判断、校验给底线</em>。</p>
+
+  <h3>双通道设计：谋 与 言</h3>
+  <div class="grid g2">
+    <div class="panel tint-purple">
+      <span class="kicker">谋 · Tactician 通道</span>
+      <p class="small" style="margin:0">输入：局面快照 + 合法候选（含启发式分与标签）+ 人格偏好。<br>输出：一条结构化决策 <code>{pick, target, stop, why}</code>。<br>预算：≤ 72 token，超时 4.0 s，温度 0.55。<br>职责：决定<strong>出哪张、打谁、何时收手</strong>。</p>
+    </div>
+    <div class="panel tint-cyan">
+      <span class="kicker">言 · Voice 通道</span>
+      <p class="small" style="margin:0">输入：同一局面快照 + 已定决策与后续计划（<code>peekPlan</code>）+ 人格声线。<br>输出：一到两句口语台词。<br>预算：≤ 72 / 56 / 48 token，超时 4.0 / 2.2 / 1.8 s，温度 0.82。<br>职责：<strong>把心思说出来</strong>，包括有意的信息泄露。</p>
+    </div>
+  </div>
+  <p class="small mt1">两条通道共用一个 2B 模型实例与同一段“局面前缀”，因此第二次请求几乎全部命中 KV 前缀缓存（见《创意与技术说明》性能一节）。它们在语义上也刻意耦合：台词通道拿到的不是“事后解释”，而是决策通道输出的 <code>why</code> 字段与规划器给出的下一步预览，这保证了敌人说的和做的是一回事。</p>
+
+  <h3>敌人回合的决策循环</h3>
+  <div class="vflow tight">
+    <div class="node"><span class="n">①</span><div><span class="t">结算预兆</span> <span class="d">— 确定性规则先行，形成本回合的“开场动作”。</span></div></div>
+    <div class="node"><span class="n">②</span><div><span class="t">局面序列化</span> <span class="d">— <code>boardSnapshot()</code> 把双方血量/护甲/法力/手牌数/牌库数/场面随从（攻血、嘲讽、可攻）/已显露预兆压成约 120 token 的中文文本。</span></div></div>
+    <div class="node"><span class="n">③</span><div><span class="t">合法动作枚举</span> <span class="d">— 规则引擎 <code>canPlay / validTargets / validAttackTargets</code> 给出全部合法出牌与攻击组合，非法动作在源头不存在。</span></div></div>
+    <div class="node"><span class="n">④</span><div><span class="t">启发式评估</span> <span class="d">— <code>scorePlay / chooseAttackTarget</code> 为每个候选打分并打标签（斩杀 / 解场 / 过嘲讽 / 铺场 / 保命）。</span></div></div>
+    <div class="node ai"><span class="n">⑤</span><div><span class="t">大模型决策</span> <span class="d">— 将快照 + Top-K 候选 + 人格偏好送入 Qwen3.5-2B，约束输出 JSON；模型可以选任一候选，也可以选择“停手”。</span></div></div>
+    <div class="node"><span class="n">⑥</span><div><span class="t">校验与执行</span> <span class="d">— 解析 JSON → 校验 pick/target 仍合法 → 执行；解析失败、超时或不合法则采用启发式首选。</span></div></div>
+    <div class="node ai"><span class="n">⑦</span><div><span class="t">思考台词</span> <span class="d">— 与 ⑤ 并行发起：<code>fakeThink</code> 保证最短思考节拍，<code>speakThink</code> 生成“我准备……”的口语。</span></div></div>
+    <div class="node"><span class="n">⑧</span><div><span class="t">循环直到停手</span> <span class="d">— 出牌阶段与攻击阶段各自循环（守卫上限 28 步），模型返回 <code>stop</code> 或无候选时结束回合。</span></div></div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 05 认知引擎 ② -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>05 · 对手认知引擎 ②</span></div>
+  <div class="kicker">05 · 对手认知引擎 ②</div>
+  <h2>候选评估与大模型决策</h2>
+
+  <div class="grid g-2-3">
+    <div>
+      <h4 style="margin-top:0">为什么不让模型“自由出牌”</h4>
+      <p class="small">2B 级模型直接输出“出第几张牌打谁”会频繁产生不合法动作（打不存在的目标、法力不够、忽略嘲讽），且难以在一秒内稳定收敛。我们把问题改写为<strong>在带注释的候选集合中做选择</strong>：候选由规则引擎保证合法，启发式给出参考价值与语义标签，模型的工作从“计算”变为“判断与取舍”——这恰恰是语言模型擅长的部分。</p>
+      <h4>启发式评估器</h4>
+      <p class="small">随从基础分 <code>1.6·cost + atk + 0.8·hp</code>，再按关键字与战吼叠加：嘲讽 +3（tank 原型 +7）、冲锋按攻击 ×1.0–2.2、群伤在对方 ≥2 随从时 +8、治疗按己方失血量加权。伤害法术优先判定<strong>斩杀（200 分硬上限）</strong>与<strong>击杀最高价值随从</strong>，否则依原型决定是否打脸。攻击目标优先斩杀、其次“无损换”、再按原型在“解威胁”与“打脸”间取舍。</p>
+    </div>
+    <div>
+      <span class="kicker">决策提示词（节选，实际为中文）</span>
+<pre><code>[system] 你是「水晶守望者」，沉稳，先叠甲再反打。
+你正在打一局卡牌。只能从下列候选中选一个，或选择停手。
+只输出一行 JSON：
+{"pick":编号|0,"target":目标|null,"why":"十字内"}
+
+[user]
+回合 4，当前行动：你
+你：16/16 血 甲2，法力 4/4，手牌 5，牌库 8
+对手：36/40 血，手牌 5
+你的场面：水晶守卫 2/5 嘲讽
+对手场面：烈焰小鬼 2/1 可攻；雷霆武士 4/3 可攻
+候选：
+ 1. 出「圣光骑士」5费 → 场上 [分 15.2] #铺场 #嘲讽 (法力不足)
+ 2. 出「霜盾」2费 → 自己 [分 11.0] #保命 #护甲
+ 3. 出「圣击」1费 → 「烈焰小鬼」 [分 12.8] #解场 #击杀
+ 4. 出「圣击」1费 → 那个法师 [分 5.0] #打脸
+ 0. 停手，保留法力
+
+[assistant]
+{"pick":3,"target":"烈焰小鬼","why":"先清小鬼，骑士下回合再立"}</code></pre>
+    </div>
+  </div>
+
+  <h3>输出约束与解析</h3>
+  <div class="grid g3">
+    <div class="panel"><h4 style="margin-top:0">单行 JSON</h4><p class="small" style="margin:0">关闭思维链（<code>enable_thinking:false</code>），<code>max_tokens</code> 压到 72，避免模型“讲道理”。解析时剥离 <code>&lt;think&gt;</code> 残留与围栏，宽松匹配首个 <code>{...}</code>。</p></div>
+    <div class="panel"><h4 style="margin-top:0">编号而非名字</h4><p class="small" style="margin:0">候选以编号引用，目标以“名字 / 那个法师 / 你自己”三种可枚举形式引用，解析后映射回实例 <code>uid</code>。不可选候选也列出并标注原因。</p></div>
+    <div class="panel"><h4 style="margin-top:0">Top-K 截断</h4><p class="small" style="margin:0">最多呈现 6 个候选（分数降序，每类标签至少一个），提示长度控制在 400 token 内。存在斩杀候选时跳过模型直接执行。</p></div>
+  </div>
+
+  <h3>候选语义标签 <span class="small muted" style="font-weight:400;font-family:var(--sans)">— 把数值结论翻译成模型能推理的语言</span></h3>
+  <table class="compact">
+    <tr><th>标签</th><th>触发条件</th><th>典型人格倾向</th></tr>
+    <tr><td><code>#斩杀</code></td><td>该动作可使对方英雄生命归零（含护甲）</td><td>全部原型 · 跳过模型直接执行</td></tr>
+    <tr><td><code>#解场</code> / <code>#击杀</code></td><td>指向伤害或攻击可击杀对方随从</td><td>control / tank 优先</td></tr>
+    <tr><td><code>#打脸</code> / <code>#过嘲讽</code></td><td>直伤英雄；清掉唯一嘲讽后可直伤面门</td><td>aggro / tempo / boss</td></tr>
+    <tr><td><code>#铺场</code> / <code>#嘲讽</code></td><td>召唤随从；带嘲讽额外标注</td><td>tank 偏嘲讽，buff 偏多体</td></tr>
+    <tr><td><code>#保命</code> / <code>#护甲</code> / <code>#治疗</code></td><td>己方生命 ≤40%，或对方场面攻击 ≥ 己方剩余生命</td><td>tank / control 权重更高</td></tr>
+    <tr><td><code>#停手</code></td><td>始终存在；分值为剩余法力 ×0.4，鼓励保留资源</td><td>模型自主判断</td></tr>
+  </table>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 06 认知引擎 ③ -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>06 · 对手认知引擎 ③</span></div>
+  <div class="kicker">06 · 对手认知引擎 ③</div>
+  <h2>校验、降级与“思考节拍”</h2>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">三级降级链</h4>
+      <div class="vflow">
+        <div class="node ai"><span class="n">L0</span><div><span class="t">模型决策</span> <span class="d">— 侧车在线、JSON 合法、pick/target 校验通过。</span></div></div>
+        <div class="node"><span class="n">L1</span><div><span class="t">启发式首选</span> <span class="d">— 超时（4 s）/ 解析失败 / 目标已失效 → 采用评估器 Top-1。玩家无感知。</span></div></div>
+        <div class="node"><span class="n">L2</span><div><span class="t">保底规则</span> <span class="d">— 评估器无正分候选时：最低费随从 → 首个合法法术 → 停手。</span></div></div>
+      </div>
+      <p class="small mt1">任何一级失败都在同一个 <code>await</code> 内完成回退，不产生额外帧延迟。侧车探活（<code>/health</code>，700 ms 超时）在每场战斗开始时执行一次，结果决定 HUD 是否显示“本地模型思考中”标识——我们不向玩家展示一个不存在的大脑。</p>
+
+      <h4>状态一致性校验</h4>
+      <ul class="small">
+        <li>模型返回时重新执行 <code>canPlay(inst)</code> 与 <code>validTargets</code>，因为并行的台词请求不会改变局面，但异步等待期间玩家可能已触发对局结束。</li>
+        <li>攻击阶段的 <code>target</code> 必须仍在 <code>validAttackTargets(attacker)</code> 中（嘲讽可能刚被清掉，也可能刚被铺上）。</li>
+        <li>每个循环阶段带守卫计数（28 步），杜绝模型反复“停手 → 继续”造成的死循环。</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-top:0">思考节拍：让快变得可信</h4>
+      <p class="small">2B 模型在消费级 GPU 上一次决策通常 200–400 ms，比人眨眼还快。直接执行会让敌人像脚本一样“瞬移出牌”，反而削弱“对面有人”的感觉。<code>think.js</code> 引入<strong>最短思考时长</strong>并与推理并行：</p>
+      <table class="compact">
+        <tr><th>时机</th><th>基础</th><th>随机</th><th>减少动效模式</th></tr>
+        <tr><td>回合首个动作</td><td class="num">2200 ms</td><td class="num">+0–1800</td><td class="num">640 + 0–360</td></tr>
+        <tr><td>出牌</td><td class="num">1600 ms</td><td class="num">+0–1400</td><td class="num">520 + 0–300</td></tr>
+        <tr><td>攻击</td><td class="num">1400 ms</td><td class="num">+0–1200</td><td class="num">480 + 0–280</td></tr>
+        <tr><td>台词最短停留</td><td class="num">720 ms</td><td>—</td><td>—</td></tr>
+      </table>
+      <p class="small">节拍等待与模型推理 <code>Promise.all</code> 并行，因此推理时间几乎被完全隐藏；只有当推理超过节拍窗口时玩家才会额外等待，而 4 s 超时保证这一等待有上界。系统尊重 <code>prefers-reduced-motion</code>，在该模式下把节拍压到 1 s 以内。</p>
+
+      <div class="panel tint-green mt1">
+        <span class="kicker">决策质量内测（80 场，Vulkan 后端）</span>
+        <table class="compact" style="margin:0">
+          <tr><td>决策合法率（校验后）</td><td class="num">100%</td></tr>
+          <tr><td>模型输出直接可用率（L0）</td><td class="num">93.4%</td></tr>
+          <tr><td>回退至启发式（L1）</td><td class="num">6.1%</td></tr>
+          <tr><td>保底规则（L2）</td><td class="num">0.5%</td></tr>
+          <tr><td>模型与启发式 Top-1 不一致率</td><td class="num">27.8%</td></tr>
+          <tr><td>不一致决策中被内测者评为“更像人”</td><td class="num">71%</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p class="small" style="margin:0"><strong>“不一致”正是价值所在。</strong>启发式评分是一条平均意义上的最优解，模型的不一致决策通常表现为：保留斩杀牌等一回合、面对快攻提前铺嘲讽而非贪铺场、残血时放弃解场直接打脸赌斩杀。这些决定不一定“更强”，但让每位敌人有了可辨认的性情，也让玩家的“读心”得到回报。</p>
+  </div>
+  <div class="callout">
+    <p class="small" style="margin:0"><strong>人格如何进入决策。</strong>每位敌人的 <code>archetype</code>（aggro / tank / control / status / buff / tempo / boss）同时作用于两处：一是启发式评分中的权重（例如 tank 原型嘲讽 +7、aggro 原型打脸 +6），二是系统提示中的一句偏好描述（“先叠甲再反打”）。前者改变候选排序，后者改变模型取舍——两者一致，所以敌人的行为风格是稠密而稳定的，而不是偶尔抽风。</p>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 07 台词 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>07 · 台词生成</span></div>
+  <div class="kicker">07 · 台词生成</div>
+  <h2>事件驱动的人格化表达</h2>
+  <p>台词不是装饰。敌人说什么、什么时候说，由一套<strong>事件 → 调度 → 提示 → 净化</strong>的管线控制，目的只有一个：让玩家相信对面有一个在看盘、在想、偶尔会说漏嘴的人。</p>
+
+  <div class="grid g-2-1">
+    <div>
+      <h4 style="margin-top:0">事件与调度参数</h4>
+      <table class="compact">
+        <tr><th>事件</th><th>触发</th><th class="num">冷却</th><th class="num">概率</th><th class="num">优先级</th></tr>
+        <tr><td>think</td><td>敌人决定一个动作前</td><td class="num">—</td><td class="num">100%</td><td class="num">4</td></tr>
+        <tr><td>player_play</td><td>玩家打出一张牌</td><td class="num">6.5 s</td><td class="num">48%</td><td class="num">3</td></tr>
+        <tr><td>player_attack</td><td>玩家随从攻击</td><td class="num">7.5 s</td><td class="num">36%</td><td class="num">3</td></tr>
+        <tr><td>hurt</td><td>敌方英雄单次受伤 ≥5</td><td class="num">8 s</td><td class="num">38%</td><td class="num">3</td></tr>
+        <tr><td>kill</td><td>随从阵亡</td><td class="num">8 s</td><td class="num">40%</td><td class="num">3</td></tr>
+        <tr><td>draw</td><td>敌人回合摸牌</td><td class="num">11 s</td><td class="num">34%</td><td class="num">2</td></tr>
+        <tr><td>idle</td><td>玩家回合静默 4.8–9 s</td><td class="num">7 s</td><td class="num">62%</td><td class="num">1</td></tr>
+        <tr><td>phase / over</td><td>形态切换 / 对局结束</td><td class="num">0</td><td class="num">100%</td><td class="num">5</td></tr>
+      </table>
+      <p class="small">同一时刻只允许一条请求在途；高优先级事件可抢占低优先级（<code>gen</code> 计数使被抢占的回包静默丢弃）。<code>think</code> 说过的动作不再触发 <code>play / attack</code> 事件，避免“我要出 X”“我出了 X”的复读。</p>
+
+      <h4>净化管线</h4>
+      <ol class="small" style="margin-bottom:0">
+        <li>剥离 <code>&lt;think&gt;</code> 残留、换行合并、去掉“敌人：”类说话人前缀、解开整句引号。</li>
+        <li>策略词过滤：命中“建议 / 最优 / 作为AI / 语言模型”等即整句丢弃。</li>
+        <li><code>takeSpoken</code>：按句号切分，最多保留两句、48–96 字，<strong>绝不从词中间截断</strong>。</li>
+        <li><code>isUsableLine</code>：非闲聊场景拒绝“嗯…”类空洞回应。</li>
+        <li>不可用则回落到该人格的本地句库（含口癖注入，28% 概率）。</li>
+      </ol>
+    </div>
+    <div>
+      <span class="kicker">实机台词样本（Qwen3.5-2B 本地生成）</span>
+      <div class="bubble"><span class="who">水晶守望者 · think</span>我就把「虚空萤火」打出去，把对面那俩小鬼引开，好等它们冲上来撞到我堆满的甲上。<span class="ctx">决策：出虚空萤火 · 计划：下回合霜盾</span></div>
+      <div class="bubble"><span class="who">水晶守望者 · player_play</span>我的血线稳如磐石，你刚才那枚武士只值三十点，我这边有骑士能扛住。<span class="ctx">玩家打出雷霆武士 · 提示：手里有圣光骑士可挡</span></div>
+      <div class="bubble"><span class="who">水晶守望者 · draw</span>冰霜精灵刚到手，我这就上去封住他的蓝。<span class="ctx">摸到冰霜精灵</span></div>
+      <div class="bubble"><span class="who">水晶守望者 · think</span>我手里有圣光骑士，刚打出一张水晶守卫。你那两只小鬼撞上来，只会撞碎在我的甲上。<span class="ctx">决策：出水晶守卫 · 有意泄露手牌</span></div>
+      <div class="bubble"><span class="who">深渊魔王 · idle</span>Nice, a big draw, but I don't play what I want.<span class="ctx">人格 mix_en：偶尔夹英文（此条被净化器判定为过度英文，已列入负样本）</span></div>
+      <p class="tiny muted mt1" style="margin:0">样本取自 2026-09-15 实机日志，未经修改。最后一条展示了净化管线仍在迭代的边界情形。</p>
+    </div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 08 远征层 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>08 · 远征层算法</span></div>
+  <div class="kicker">08 · 远征层算法</div>
+  <h2>地图、经济与随机性</h2>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">地图生成</h4>
+      <p class="small">第一幕采用固定的 14 层<strong>类型骨架</strong>（如 <code>[combat] → [combat, event] → [combat, combat, event] → [shop, combat] …</code>），每层节点随机绑定遭遇 / 事件，遭遇在一局内不重复（<code>usedEnc</code>），事件按洗牌袋轮转。层间连边保证每个节点至少一条入边与一条出边，并以 50% 概率追加交叉边形成分支。</p>
+      <p class="small">节点坐标通过“层带内随机漫步 + 同层打散 + 无交叉松弛”三步布置：先沿一条随机蛇形脊线放置每层，再对同层节点枚举排列以最小化连线交叉（交叉惩罚 240），最后做 36 轮弹簧松弛与兄弟节点分离，得到自然、不规则、不重叠的路网。</p>
+      <h4>经济曲线</h4>
+      <table class="compact">
+        <tr><th>来源 / 去向</th><th>数值</th></tr>
+        <tr><td>开局金币</td><td class="num">90</td></tr>
+        <tr><td>普通战斗 / 精英</td><td class="num">18–24 / 28–38</td></tr>
+        <tr><td>宝藏</td><td class="num">28–43 + 遗物</td></tr>
+        <tr><td>商店卡牌（普/稀/史/传）</td><td class="num">42 / 55 / 72 / 90</td></tr>
+        <tr><td>商店遗物 / 删牌 / 刷新</td><td class="num">160 / 75 / 25</td></tr>
+        <tr><td>“商会火漆”遗物</td><td class="num">全场 −20%</td></tr>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin-top:0">奖励与稀有度权重</h4>
+      <table class="compact">
+        <tr><th>稀有度</th><th class="num">普通战斗</th><th class="num">精英 / 首领</th></tr>
+        <tr><td>普通</td><td class="num">48</td><td class="num">20</td></tr>
+        <tr><td>稀有</td><td class="num">32</td><td class="num">40</td></tr>
+        <tr><td>史诗</td><td class="num">15</td><td class="num">28</td></tr>
+        <tr><td>传说</td><td class="num">5</td><td class="num">12</td></tr>
+      </table>
+      <p class="small">战斗奖励三选一且不重复；精英与宝藏必掉遗物。10 件遗物覆盖经济（余烬钱袋、商会火漆）、曲线（晶核、贤者羽笔）、防御（守护鳞、荆棘徽记、活心）与进攻（战旗、虚空透镜）。</p>
+
+      <h4>一条随机数流</h4>
+      <p class="small">远征与战斗共用同一条 <code>mulberry32</code> 流。给定种子（URL <code>?seed=</code>），地图、卡包抽取、洗牌、事件结果、商店内容全部可复现。这带来两个直接收益：<strong>Bug 可复现</strong>（测试报告只需附一个种子），以及<strong>模拟器与真实对局完全同构</strong>——模拟器跑出的“第 5 层阵亡率偏高”可以直接在浏览器里用同一个种子重演。</p>
+      <div class="panel tint-purple mt1">
+        <span class="kicker">模型与随机性的边界</span>
+        <p class="small" style="margin:0">大模型是唯一不在随机数流内的组件。为了保留复现能力，决策通道在 <code>fastAI</code>（模拟器）模式下被完全跳过，走确定性启发式；在真实对局中，模型温度 0.55 + 校验器保证行为分布稳定但不完全确定——这正是“像人”的来源。</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>事件设计样例</h3>
+  <div class="grid g3">
+    <div class="panel"><h4 style="margin-top:0">血色钱币</h4><p class="small" style="margin:0">翻赤铜（50%：+45 金 / −8 血）、取苍银（+15 金）、绕开。教玩家理解“风险即资源”。</p></div>
+    <div class="panel"><h4 style="margin-top:0">关卡征收</h4><p class="small" style="margin:0">交 35 金、用 12 血买路，或拔剑——进入短遭遇“伏击影魔”。事件与战斗系统打通。</p></div>
+    <div class="panel"><h4 style="margin-top:0">暗影契约</h4><p class="small" style="margin:0">签字：史诗/传说牌 −11 血；撕毁：+22 金但牌库塞入一张“负担”（抽 1 自伤 3）。</p></div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 09 验证 -->
+<section class="page">
+  <div class="hdr"><span>核心玩法与算法说明</span><span>09 · 验证</span></div>
+  <div class="kicker">09 · 验证</div>
+  <h2>模拟器、自动化测试与实测数据</h2>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">无渲染平衡模拟器 <code>npm run sim</code></h4>
+      <p class="small">用 <code>fxStub</code> 替换表现层后，整局远征可在 Node 中以毫秒级速度跑完。玩家侧由一套简单策略（<code>sim/choices.js</code>）驾驭，敌人侧走确定性启发式。以下为 2026-09-15 对当前数值的一次 120 局采样（每包 40 局，约 0.16 s 完成）：</p>
+      <table class="compact">
+        <tr><th>敌人</th><th class="num">对局数</th><th class="num">玩家胜率</th><th>解读</th></tr>
+        <tr><td>雷霆先锋 / 虚空织法者</td><td class="num">25 / 25</td><td class="num">100%</td><td>中层偏软，待加压</td></tr>
+        <tr><td>伏击影魔</td><td class="num">21</td><td class="num">95.2%</td><td>事件遭遇，符合预期</td></tr>
+        <tr><td>毒瘴术士 / 灰烬掠夺者</td><td class="num">107 / 92</td><td class="num">92.5 / 92.4%</td><td>早期教学难度</td></tr>
+        <tr><td>水晶守望者</td><td class="num">83</td><td class="num">66.3%</td><td>早期“第一道墙”</td></tr>
+        <tr><td>暮刃刺客长</td><td class="num">24</td><td class="num">66.7%</td><td>精英，合理</td></tr>
+        <tr><td>深渊魔王</td><td class="num">22</td><td class="num">63.6%</td><td>到达者胜率，合理</td></tr>
+        <tr><td>战鼓蛮兵</td><td class="num">27</td><td class="num">51.9%</td><td>中层</td></tr>
+        <tr><td>腐化龙嗣</td><td class="num">21</td><td class="num">47.6%</td><td>精英</td></tr>
+        <tr><td>圣堂壁垒</td><td class="num">28</td><td class="num">21.4%</td><td>过强，下版本调低圣愈</td></tr>
+      </table>
+      <p class="small">整局通关率 11.7%（余烬 15% · 晶壁 17.5% · 裂隙 2.5%），平均到达 5.45 层。裂隙织法明显偏弱、圣堂壁垒明显偏强，这两条已进入下一轮数值调整。<strong>模拟器让“感觉难”变成了“哪一层、哪个敌人、差多少”。</strong></p>
+    </div>
+    <div>
+      <h4 style="margin-top:0">自动化回归 <code>npm test</code></h4>
+      <table class="compact">
+        <tr><th>脚本</th><th>覆盖</th></tr>
+        <tr><td>check-combat-logic</td><td>出牌 / 攻击 / 嘲讽 / 战吼 / 亡语 / 疲劳 / 胜负</td></tr>
+        <tr><td>check-run-logic</td><td>地图连通、商店买卖删刷、事件结果、遗物</td></tr>
+        <tr><td>check-banter</td><td>净化管线、提示词字段、人格映射、思考 HUD 状态机、计划预览</td></tr>
+        <tr><td>check-hud-logic</td><td>HUD 模式切换与提示</td></tr>
+        <tr><td>check-tutorial-logic</td><td>新手引导步骤</td></tr>
+        <tr><td>check-bgm / check-qwen-pack</td><td>音频场景表；模型与运行时打包完整性</td></tr>
+      </table>
+      <h4>浏览器内调试接口</h4>
+<pre style="margin-bottom:2mm"><code>__tcg.state()     // 局面快照 + 引擎状态
+__tcg.play(0,{slot:0})  // 打出第 0 张手牌
+__tcg.attack(0,'ehero') // 随从 0 攻击英雄
+__tcg.end()       // 结束回合，触发敌人 AI
+__tcg.errors      // 运行期错误，应恒为空
+?seed=20260915    // 固定种子复现</code></pre>
+      <div class="panel tint-purple">
+        <span class="kicker">实测推理数据（llama-server 日志）</span>
+        <table class="compact" style="margin:0">
+          <tr><td>提示处理速度</td><td class="num">2 800–4 800 tok/s</td></tr>
+          <tr><td>生成速度</td><td class="num">≈ 199 tok/s</td></tr>
+          <tr><td>单次决策 / 台词总耗时</td><td class="num">174–281 ms</td></tr>
+          <tr><td>KV 前缀命中（LCP 相似度）</td><td class="num">0.52–0.60</td></tr>
+        </table>
+        <p class="tiny muted mt1" style="margin:0">环境：Windows 11 · AMD Ryzen 7 9700X · Vulkan 后端默认设备 · Qwen3.5-2B Q4_K_M · ctx 2048 · 4 slots。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout mt2">
+    <p class="small" style="margin:0"><strong>三层验证各管一段。</strong>自动化回归保证规则层每次改动不破坏既有行为；无渲染模拟器把数值平衡从“体感”变成可比较的胜率与到达层数；实机日志则回答“模型在真实硬件上够不够快、够不够稳”。三者都可在仓库内一条命令复现（<code>npm test</code> · <code>npm run sim</code> · <code>npm run qwen:serve</code>），评审可在任意 Windows 机器上重跑本节全部数据。</p>
+  </div>
+  <div class="ftr"><span>奥术对决 · 核心玩法与算法说明</span><span class="pn"></span></div>
+</section>
+
+<script>document.querySelectorAll('.page').forEach((p,i)=>{const n=p.querySelector('.pn'); if(n) n.textContent=String(i+1).padStart(2,'0');});</script>
+</body>
+</html>

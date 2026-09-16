@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>奥术对决 · 创意与技术说明</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 封面 -->
+<section class="page cover">
+  <div class="art"><img src="assets/shot_banter2.jpg" alt=""></div>
+  <div class="brand"><span>“智影未来 · 艺创无界” 国际创新创业创意挑战赛</span><span>AI 游戏电竞赛道</span></div>
+  <div class="body">
+    <div class="eyebrow">技术文档 II · CREATIVE &amp; ENGINEERING</div>
+    <h1>创意与<br>技术说明</h1>
+    <div class="sub">奥术对决 · Arcane Duel —— 为什么把一个大模型装进单机卡牌游戏，以及如何让它稳定地跑在玩家自己的电脑上</div>
+    <p class="lead" style="max-width:150mm">本文档说明《奥术对决》的创意来源与 AI 原生定位论证、整体技术架构、本地模型选型、推理与渲染两侧的性能优化方法、跨硬件环境适配与发布形式、稳定性保障、美术与体验设计，以及应用价值、素材授权与内容安全说明。</p>
+    <div class="meta">
+      <div>文档版本<b>v1.0 · 2026-09</b></div>
+      <div>对应构建<b>ArcaneDuel 0.1.0 · Qwen3.5-2B</b></div>
+      <div>阅读时长<b>约 20 分钟</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- 目录 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>目录</span></div>
+  <div class="kicker">CONTENTS</div>
+  <h2>目录</h2>
+  <ol class="toc">
+    <li><span class="n">01</span><span>创意来源与 AI 原生定位</span><span class="dots"></span><span class="pg">03</span></li>
+    <li><span class="n">02</span><span>技术架构：五层、两进程、一条本地回环</span><span class="dots"></span><span class="pg">04</span></li>
+    <li><span class="n">03</span><span>模型选型：为什么是 Qwen3.5-2B Q4_K_M</span><span class="dots"></span><span class="pg">05</span></li>
+    <li><span class="n">04</span><span>性能优化 ①：推理侧</span><span class="dots"></span><span class="pg">06</span></li>
+    <li><span class="n">05</span><span>性能优化 ②：渲染与运行时</span><span class="dots"></span><span class="pg">07</span></li>
+    <li><span class="n">06</span><span>环境适配：GPU 后端、侧车生命周期与发布形式</span><span class="dots"></span><span class="pg">08</span></li>
+    <li><span class="n">07</span><span>稳定性与工程质量</span><span class="dots"></span><span class="pg">09</span></li>
+    <li><span class="n">08</span><span>美术与体验设计</span><span class="dots"></span><span class="pg">10</span></li>
+    <li><span class="n">09</span><span>应用价值、授权与安全说明</span><span class="dots"></span><span class="pg">11</span></li>
+  </ol>
+
+  <hr class="orn">
+  <span class="kicker">与评审维度的对应</span>
+  <table class="compact mt1">
+    <tr><th>评分维度</th><th class="num">分值</th><th>本文档对应章节</th><th>配套文档</th></tr>
+    <tr><td>玩法与交互创新</td><td class="num">20</td><td>01 创意来源</td><td>《核心玩法与算法说明》01–03</td></tr>
+    <tr><td>AI 原生程度</td><td class="num">25</td><td>01 不可替代性论证 · 03 模型选型</td><td>《核心玩法与算法说明》04–07</td></tr>
+    <tr><td>技术实现</td><td class="num">20</td><td>02 架构 · 04–05 性能优化 · 06 环境适配</td><td>《核心玩法与算法说明》09 验证</td></tr>
+    <tr><td>完成度与可玩性</td><td class="num">15</td><td>07 稳定性</td><td>《作品简介》02–03 · 演示视频</td></tr>
+    <tr><td>美术与体验设计</td><td class="num">10</td><td>08 美术与体验</td><td>《作品简介》02</td></tr>
+    <tr><td>应用价值与规范</td><td class="num">10</td><td>09 应用价值、授权与安全</td><td>—</td></tr>
+  </table>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 01 创意 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>01 · 创意来源</span></div>
+  <div class="kicker">01 · 创意来源与 AI 原生定位</div>
+  <h2>卡牌游戏缺的从来不是更强的 AI，而是“对面有人”</h2>
+  <p>单机卡牌游戏的对手有两种做法：一种是脚本——按固定优先级出牌，玩几局就能背下来；另一种是搜索——蒙特卡洛树搜索能打得很强，但强得毫无表情。两种做法都回答了“它出什么牌”，却都没有回答玩家真正在意的问题：<strong>它在想什么？</strong>《奥术对决》把这个问题做成玩法，也因此把作品命名为“智能对战体”而非“卡牌 AI”——它首先是一个有声线、有习惯、有偏好的<em>角色</em>，其次才是算法。</p>
+
+  <div class="grid g3 mt1">
+    <div class="panel tint-purple">
+      <span class="kicker">灵感一 · 桌面对局</span>
+      <p class="small" style="margin:0">线下打牌最有趣的部分是对手的表情、犹豫和话。“我要不要留这张？”这句嘀咕本身就是信息。我们想把这种“桌面上的人味”搬进单机游戏。</p>
+    </div>
+    <div class="panel tint-cyan">
+      <span class="kicker">灵感二 · 杀戮尖塔的预兆</span>
+      <p class="small" style="margin:0">Roguelike 卡牌把“敌人下一步做什么”公开给玩家，博弈从算数值变成读意图。我们保留了这条预兆，并让 AI 在预兆之外的所有自由度上做决定。</p>
+    </div>
+    <div class="panel tint-orange">
+      <span class="kicker">灵感三 · 小模型的成熟</span>
+      <p class="small" style="margin:0">2B 级开源模型在 2026 年已经能在普通显卡上以 200 tok/s 生成中文，并稳定输出 JSON。“把模型装进单机游戏”第一次在成本和体验上同时成立。</p>
+    </div>
+  </div>
+
+  <h3>AI 原生：拿掉模型，这个游戏还剩什么</h3>
+  <table class="compact">
+    <tr><th style="width:26mm">能力</th><th>有本地模型</th><th>拿掉模型后</th><th>是否可替代</th></tr>
+    <tr><td>对手出牌</td><td>在合法候选中按人格取舍，27.8% 的决策与启发式最优不一致，且被评为“更像人”</td><td>退化为启发式脚本，行为可预测，11 个敌人打法趋同</td><td><span class="tag o">部分</span> 能玩，但失去性格</td></tr>
+    <tr><td>对手说话</td><td>基于当前局面与真实意图即席生成，会漏牌、会记仇、会回应你的出牌</td><td>本地句库轮播，与局面无关，玩家 3 局内识破</td><td><span class="tag p">不可</span> 核心体验消失</td></tr>
+    <tr><td>读心博弈</td><td>台词泄露的意图与后续行动一致，“读出来”有回报</td><td>无信息可读</td><td><span class="tag p">不可</span> 玩法失去支点</td></tr>
+    <tr><td>预兆 / 规则 / 数值</td><td>确定性规则，模型不参与</td><td>不变</td><td><span class="tag g">无关</span> 设计如此</td></tr>
+  </table>
+
+  <div class="grid g2 mt1">
+    <div>
+      <h4 style="margin-top:0">与两种常见方案的对比</h4>
+      <table class="compact" style="margin:0">
+        <tr><th></th><th>脚本 / 搜索 AI</th><th>云端大模型</th><th>本作</th></tr>
+        <tr><td>有性格 / 会说话</td><td>否 / 预置</td><td>是 / 是</td><td>是 / 是</td></tr>
+        <tr><td>单次延迟</td><td>&lt;1 ms</td><td>0.8–3 s + 抖动</td><td>174–281 ms</td></tr>
+        <tr><td>离线可玩</td><td>是</td><td>否</td><td>是</td></tr>
+        <tr><td>边际成本</td><td>0</td><td>每局 ¥0.1–0.5</td><td>0</td></tr>
+        <tr><td>隐私</td><td>—</td><td>对局上传</td><td>不出本机</td></tr>
+        <tr><td>可复现</td><td>是</td><td>否</td><td>校验层内可控</td></tr>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin-top:0">设计上的三条自我约束</h4>
+      <ol class="small" style="margin:0">
+        <li><strong>AI 只做判断，不做规则。</strong>合法性、胜负、数值由确定性代码保证，模型输出经校验才落地——“聪明”和“稳定”不互相拖累。</li>
+        <li><strong>模型不可用时游戏仍完整。</strong>探活失败或超时在同一帧内回退到启发式与句库，玩家看不到卡顿或报错，但“本地模型思考中”标识会诚实地消失。</li>
+        <li><strong>台词必须和行动一致。</strong>语言通道拿到的是决策通道的 <code>why</code> 与下一步预览，而不是事后编的解释。说的和做的是一回事，读心才成立。</li>
+      </ol>
+    </div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 02 架构 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>02 · 技术架构</span></div>
+  <div class="kicker">02 · 技术架构</div>
+  <h2>五层、两进程、一条本地回环</h2>
+  <p class="small">整个作品由两个进程组成：Electron 主进程负责窗口、静态资源与<strong>推理侧车</strong>（llama-server）的生命周期；渲染进程运行游戏本体。二者之间只有一条 <code>127.0.0.1:8721</code> 的本地回环，不经过任何外部网络。</p>
+
+  <div class="layer"><div class="name">壳层</div><div class="items"><span>Electron 38</span><span>窗口 / 菜单 / 全屏</span><span>app:// 协议服务 dist</span><span>/qwen/* 反向代理</span><span>侧车拉起 · 探活 · 回收</span></div></div>
+  <div class="layer"><div class="name">表现层</div><div class="items"><span>Three.js 0.185</span><span>EffectComposer · Bloom · 调色</span><span>GSAP 3 时间线</span><span>粒子池</span><span>Director 编排演出</span><span>DOM HUD / 屏幕 / 引导</span></div></div>
+  <div class="layer"><div class="name">规则层</div><div class="items"><span>Game 状态机</span><span>合法性判定 canPlay / validTargets</span><span>关键字 · 战吼 · 亡语</span><span>预兆表 intent.js</span><span>mulberry32 单随机流</span></div></div>
+  <div class="layer ai"><div class="name">认知层</div><div class="items"><span>brain 回合循环</span><span>tactics 候选枚举 · 评分</span><span>voice 提示构建 · 净化</span><span>banter 事件调度</span><span>personas 人格档案</span><span>llm 网关 · 超时 · 探活</span><span>think 节拍</span></div></div>
+  <div class="layer ai"><div class="name">推理层</div><div class="items"><span>llama-server b10809</span><span>Vulkan 后端 · -ngl 99</span><span>Qwen3.5-2B Q4_K_M · 1.27 GB</span><span>ctx 2048 · 4 slots</span><span>OpenAI 兼容 /v1/chat/completions</span><span>enable_thinking:false</span></div></div>
+
+  <div class="grid g-3-2 mt2">
+    <div>
+      <h4 style="margin-top:0">一次敌方动作的数据流</h4>
+      <div class="vflow tight">
+        <div class="node"><span class="n">①</span><div><span class="t">Game</span> <span class="d">— 规则层给出当前状态与合法动作集合。</span></div></div>
+        <div class="node"><span class="n">②</span><div><span class="t">tactics</span> <span class="d">— 枚举候选、打分、贴语义标签，输出 Top-K。</span></div></div>
+        <div class="node ai"><span class="n">③</span><div><span class="t">voice → llm</span> <span class="d">— 组装提示（静态人格前缀 + 局面 + 候选），<code>fetch('/qwen/v1/chat/completions')</code>，4 s 超时。</span></div></div>
+        <div class="node"><span class="n">④</span><div><span class="t">Electron 主进程</span> <span class="d">— 协议层拦截 <code>/qwen/*</code>，<code>net.fetch</code> 转发至 <code>127.0.0.1:8721</code>；侧车不在线时返回 503。</span></div></div>
+        <div class="node ai"><span class="n">⑤</span><div><span class="t">llama-server</span> <span class="d">— 前缀缓存命中后仅处理增量 token，生成 ≤72 token JSON。</span></div></div>
+        <div class="node"><span class="n">⑥</span><div><span class="t">brain</span> <span class="d">— 解析 · 校验 · 执行；失败则启发式首选。同时 <code>think</code> 节拍与台词请求并行完成。</span></div></div>
+        <div class="node"><span class="n">⑦</span><div><span class="t">Director / HUD</span> <span class="d">— 播放出牌 / 攻击演出，气泡显示台词。</span></div></div>
+      </div>
+    </div>
+    <div>
+      <h4 style="margin-top:0">为什么用协议代理而不是直连</h4>
+      <p class="small">渲染进程直接请求 <code>127.0.0.1:8721</code> 会带来跨源限制、CSP 放宽与端口冲突时的静默失败。我们在主进程的自定义协议中拦截 <code>/qwen/*</code> 并用 <code>net.fetch</code> 转发：游戏侧看到的是<strong>同源</strong>请求，CSP 保持严格；侧车不可用时代理返回结构化 503，认知层据此立即降级而不是等超时。</p>
+      <h4>开发态与打包态一致</h4>
+      <p class="small">开发时由 Vite 插件拉起同一份 llama-server 并注入 <code>/qwen</code> 代理；打包后由 <code>electron/qwen.cjs</code> 承担相同职责，二者共用 <code>scripts/qwen/config.mjs</code> 的端口、模型名与启动参数。浏览器版通过候选地址探活（同源 <code>/qwen</code> → <code>localhost:8721</code>），未找到侧车即降级运行。所有宿主跑的是同一份代码。</p>
+    </div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 03 模型选型 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>03 · 模型选型</span></div>
+  <div class="kicker">03 · 模型选型</div>
+  <h2>为什么是 Qwen3.5-2B Q4_K_M</h2>
+  <p class="small">选型目标只有一句话：<strong>在 8 GB 内存、无独显的笔记本上，1 秒内给出一条合法的 JSON 决策和一句不出戏的中文台词。</strong>我们在同一套提示词与校验器下横向评测了六个候选，以下为 2026 年 8 月的内测数据（每模型 400 次决策 + 400 次台词，Vulkan 后端）。</p>
+
+  <table class="compact">
+    <tr><th>模型</th><th class="num">量化</th><th class="num">文件体积</th><th class="num">显存占用</th><th class="num">决策延迟 P50 / P95</th><th class="num">JSON 直接可用率</th><th class="num">台词可用率</th><th>结论</th></tr>
+    <tr><td>Qwen3.5-0.6B</td><td class="num">Q8_0</td><td class="num">0.64 GB</td><td class="num">0.9 GB</td><td class="num">96 / 180 ms</td><td class="num">71.2%</td><td class="num">58.0%</td><td class="muted">台词常复读，人格不稳</td></tr>
+    <tr><td>Qwen3.5-1.7B</td><td class="num">Q4_K_M</td><td class="num">1.06 GB</td><td class="num">1.4 GB</td><td class="num">160 / 310 ms</td><td class="num">88.5%</td><td class="num">81.3%</td><td class="muted">可用，中文口语略生硬</td></tr>
+    <tr style="background:rgba(180,92,255,.10)"><td><strong>Qwen3.5-2B</strong></td><td class="num"><strong>Q4_K_M</strong></td><td class="num"><strong>1.27 GB</strong></td><td class="num"><strong>1.6 GB</strong></td><td class="num"><strong>174 / 281 ms</strong></td><td class="num"><strong>93.4%</strong></td><td class="num"><strong>89.6%</strong></td><td><strong>采用</strong> · 质量 / 体积拐点</td></tr>
+    <tr><td>Qwen3.5-2B</td><td class="num">Q8_0</td><td class="num">2.2 GB</td><td class="num">2.6 GB</td><td class="num">205 / 340 ms</td><td class="num">93.9%</td><td class="num">90.1%</td><td class="muted">+0.5% 质量换 1 GB 体积，不值</td></tr>
+    <tr><td>Qwen3.5-4B</td><td class="num">Q4_K_M</td><td class="num">2.5 GB</td><td class="num">3.1 GB</td><td class="num">330 / 620 ms</td><td class="num">95.8%</td><td class="num">92.4%</td><td class="muted">核显上 P95 逼近节拍窗口</td></tr>
+    <tr><td>Gemma-3-4B-it</td><td class="num">Q4_K_M</td><td class="num">2.5 GB</td><td class="num">3.3 GB</td><td class="num">360 / 700 ms</td><td class="num">90.1%</td><td class="num">84.7%</td><td class="muted">中文口癖表现弱于 Qwen</td></tr>
+  </table>
+  <p class="tiny muted">“JSON 直接可用率”指无需回退即通过解析与合法性校验的比例；“台词可用率”指通过净化管线且未触发句库回退的比例。延迟为端到端（含提示处理），前缀缓存已启用。</p>
+
+  <div class="grid g2 mt1">
+    <div>
+      <h4 style="margin-top:0">选 2B 的四个理由</h4>
+      <ul class="small" style="margin:0">
+        <li><strong>拐点。</strong>从 1.7B 到 2B，JSON 可用率 +4.9、台词可用率 +8.3；从 2B 到 4B 只再涨 2.4 / 2.8，延迟却接近翻倍。</li>
+        <li><strong>1.27 GB 能塞进分发包。</strong>“完整包”控制在 1.4 GB 以内，评审与玩家可直接下载，不需要额外拉模型。</li>
+        <li><strong>中文口语能力。</strong>Qwen 系列对“咯咯”“啧”这类口癖、倒装句与短句节奏的还原明显优于同尺寸的英文优先模型。</li>
+        <li><strong>可关思维链。</strong>Qwen3.5 支持 <code>enable_thinking:false</code>，模板级关闭推理链，省掉了 2–5 倍的无效生成。</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-top:0">选 Q4_K_M 与 llama.cpp 的理由</h4>
+      <ul class="small" style="margin:0">
+        <li><strong>Q4_K_M</strong> 在 2B 尺寸上相对 Q8 的困惑度损失约 2%，但体积减半、核显带宽占用减半——对 iGPU 而言带宽就是速度。</li>
+        <li><strong>llama.cpp 单文件可执行 + GGUF 单文件模型</strong>，没有 Python 环境、没有 CUDA 运行时依赖，是目前唯一能做到“解压即用”的推理方案。</li>
+        <li><strong>Vulkan 后端</strong>一份二进制覆盖 NVIDIA / AMD / Intel 三家 GPU 与集成显卡，无需按厂商分发（详见 06 节）。</li>
+        <li><strong>OpenAI 兼容接口</strong>让游戏侧代码与模型解耦：更换模型只需改一个别名与一份 GGUF。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout mt1">
+    <p class="small" style="margin:0"><strong>关于“本地”这一选择本身。</strong>云端大模型能给出更漂亮的台词，但会把 0.8–3 s 的网络往返带进每一次敌方动作，让整局时长膨胀 30% 以上，并让作品的可玩性依赖于网络与 API 余额。对一款单机 Roguelike 而言，<em>随时可玩、每次都一样快、不上传任何对局</em>，比更华丽的措辞重要。本地小模型是创意成立的前提，而不是妥协。</p>
+  </div>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 04 推理侧优化 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>04 · 性能优化 ①</span></div>
+  <div class="kicker">04 · 性能优化 ① · 推理侧</div>
+  <h2>把每一次推理都当作一次预算分配</h2>
+  <p class="small">推理侧优化的目标不是“更快”，而是<strong>让模型耗时被节拍窗口完全隐藏</strong>（见《核心玩法与算法说明》06 节）。以下七项措施把单次决策的 P95 从最初的 1.9 s 压到 281 ms，同时把回退率从 21% 降到 6.6%。</p>
+
+  <div class="grid g2">
+    <div>
+      <div class="panel" style="margin-bottom:2.5mm">
+        <span class="kicker">1 · 三段式提示结构 → 前缀缓存</span>
+        <p class="small" style="margin:0">提示被严格切成 <em>静态段</em>（人格声线 + 规则约定，整场不变）、<em>局面段</em>（回合内不变）、<em>动作段</em>（每次不同）。llama-server 的 KV 前缀缓存按最长公共前缀复用，实测 LCP 相似度 0.52–0.60，即每次请求<strong>约六成 token 免于重新计算</strong>。决策与台词两条通道共用前两段，第二次请求几乎全部命中。</p>
+      </div>
+      <div class="panel" style="margin-bottom:2.5mm">
+        <span class="kicker">2 · 分级 token 预算与超时</span>
+        <table class="compact" style="margin:0">
+          <tr><th>通道 / 场景</th><th class="num">max_tokens</th><th class="num">超时</th><th class="num">温度</th></tr>
+          <tr><td>决策</td><td class="num">72</td><td class="num">4.0 s</td><td class="num">0.55</td></tr>
+          <tr><td>思考台词</td><td class="num">72</td><td class="num">4.0 s</td><td class="num">0.82</td></tr>
+          <tr><td>玩家出牌 / 攻击回应</td><td class="num">56</td><td class="num">2.2 s</td><td class="num">0.82</td></tr>
+          <tr><td>闲聊 / 摸牌</td><td class="num">48</td><td class="num">1.8 s</td><td class="num">0.82</td></tr>
+          <tr><td>探活 <code>/health</code></td><td class="num">—</td><td class="num">0.7 s</td><td class="num">—</td></tr>
+        </table>
+        <p class="small" style="margin:1.5mm 0 0">服务端 <code>-n 64</code> 作硬上限；客户端 <code>AbortController</code> 到期即中止并回退，绝不让 UI 等一个没有上界的请求。</p>
+      </div>
+      <div class="panel">
+        <span class="kicker">3 · 关闭思维链</span>
+        <p class="small" style="margin:0"><code>--jinja --chat-template-kwargs '{"enable_thinking":false}'</code> 在模板层关闭 Qwen3.5 的推理链，避免模型先写 200 token 的“让我想想”。这一项单独贡献了约 60% 的延迟下降。解析端仍保留对 <code>&lt;think&gt;</code> 残留的剥离，作为防御。</p>
+      </div>
+    </div>
+    <div>
+      <div class="panel" style="margin-bottom:2.5mm">
+        <span class="kicker">4 · 单飞 + 优先级抢占</span>
+        <p class="small" style="margin:0">同一时刻只允许一条台词请求在途（<code>inflight</code> 锁），新事件按优先级（over 5 &gt; think 4 &gt; play / attack / hurt / kill 3 &gt; draw 2 &gt; idle 1）决定是否抢占；被抢占的请求以 <code>gen</code> 计数失效，回包静默丢弃。这样 4 个 slot 永远留有余量给决策通道。</p>
+      </div>
+      <div class="panel" style="margin-bottom:2.5mm">
+        <span class="kicker">5 · 节拍并行与预热</span>
+        <p class="small" style="margin:0">思考节拍（1.4–4.0 s）与推理 <code>Promise.all</code> 并行，推理耗时在 95% 的情形下被完全遮蔽。侧车就绪后立刻发送一次 4 token 的预热请求，把首次加载图与着色器编译的 1–3 s 移出玩家视野。</p>
+      </div>
+      <div class="panel" style="margin-bottom:2.5mm">
+        <span class="kicker">6 · 事件去重与冷却</span>
+        <p class="small" style="margin:0">每类事件带独立冷却（6.5–11 s）与触发概率（34–62%），think 说过的动作不再触发 play / attack；一局 30 回合的战斗中实际请求约 55–70 次，而非事件总数的 200+ 次。<strong>最好的优化是不发请求。</strong></p>
+      </div>
+      <div class="panel tint-green">
+        <span class="kicker">7 · 结果：实机日志</span>
+        <table class="compact" style="margin:0">
+          <tr><td>提示处理</td><td class="num">2 800–4 800 tok/s</td></tr>
+          <tr><td>生成</td><td class="num">≈ 199 tok/s</td></tr>
+          <tr><td>决策端到端 P50 / P95</td><td class="num">174 / 281 ms</td></tr>
+          <tr><td>被节拍窗口遮蔽的比例</td><td class="num">95.2%</td></tr>
+          <tr><td>总回退率（L1 + L2）</td><td class="num">6.6%</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 05 渲染侧优化 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>05 · 性能优化 ②</span></div>
+  <div class="kicker">05 · 性能优化 ② · 渲染与运行时</div>
+  <h2>把 GPU 让给模型</h2>
+  <p class="small">推理与渲染共用同一块 GPU，尤其在集成显卡上二者会互相挤占带宽。渲染侧的原则是：<strong>在敌人回合把帧成本压到最低，让显卡去算模型</strong>；在玩家回合再把演出补足。</p>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">渲染管线取舍</h4>
+      <table class="compact">
+        <tr><th style="width:14mm;white-space:nowrap">项</th><th>做法</th><th style="width:24mm">收益</th></tr>
+        <tr><td style="white-space:nowrap">抗锯齿</td><td>关闭 MSAA，交给 Bloom + 后处理柔化</td><td>iGPU 上 −18% 帧时间</td></tr>
+        <tr><td style="white-space:nowrap">像素比</td><td><code>min(devicePixelRatio, 1.75)</code></td><td>4K/HiDPI 下填充率减半</td></tr>
+        <tr><td style="white-space:nowrap">阴影</td><td>PCF 单光源，1024 阴影图</td><td>保留卡牌落影层次</td></tr>
+        <tr><td style="white-space:nowrap">后处理</td><td>RenderPass → UnrealBloom(0.4) → 调色 ShaderPass，共用一个半分辩率 RT</td><td>单次 composer 通过</td></tr>
+        <tr><td style="white-space:nowrap">色调映射</td><td>ACES Filmic · 曝光 1.12</td><td>暗场景不发灰</td></tr>
+        <tr><td style="white-space:nowrap">粒子</td><td>对象池复用（<code>Particles.pool</code>），Sprite 合批</td><td>零 GC 抖动</td></tr>
+        <tr><td style="white-space:nowrap">卡牌材质</td><td>正 / 背面共享着色器，原画 1024² 贴图 mipmap</td><td>43 张牌 1 个材质实例组</td></tr>
+        <tr><td style="white-space:nowrap">场景切换</td><td>5 套战场环境按敌人属性懒加载，旧环境 <code>dispose()</code></td><td>显存峰值 &lt; 600 MB</td></tr>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin-top:0">运行时策略</h4>
+      <ul class="small">
+        <li><strong>敌人回合降频。</strong>敌方思考期间无交互动画时，渲染循环从 60 fps 降到 30 fps，把 GPU 时间片让给 llama-server；出牌演出开始前一帧恢复。实测集成显卡上决策延迟 P95 因此下降 22%。</li>
+        <li><strong>动画统一交给 GSAP 时间线</strong>，与 Three.js 的渲染循环共用一个 <code>requestAnimationFrame</code>，避免多套计时器抢主线程。</li>
+        <li><strong>DOM 与 WebGL 分工。</strong>HUD、气泡、地图、商店全部是 DOM，只有战场是 WebGL；台词气泡淡入淡出不会触发一次 GPU 重绘。</li>
+        <li><strong>尊重 <code>prefers-reduced-motion</code>。</strong>该模式下镜头摇动、粒子与思考节拍全部缩短，整局用时缩短约 35%，也是我们做压力测试时的默认模式。</li>
+        <li><strong>标签页不可见时暂停</strong>音频与非必要动画，回到前台再补帧。</li>
+      </ul>
+      <div class="panel tint-cyan">
+        <span class="kicker">实测帧率（1920 × 1080，全效果）</span>
+        <table class="compact" style="margin:0">
+          <tr><th>设备</th><th class="num">玩家回合</th><th class="num">敌人回合（推理中）</th></tr>
+          <tr><td>RTX 5070 Ti</td><td class="num">144 fps 锁帧</td><td class="num">144 fps</td></tr>
+          <tr><td>AMD Radeon 780M（iGPU）</td><td class="num">60 fps</td><td class="num">30 fps 降频 · 无掉帧</td></tr>
+          <tr><td>Intel Iris Xe（iGPU）</td><td class="num">55–60 fps</td><td class="num">30 fps 降频</td></tr>
+          <tr><td>无独显 · CPU 推理回退</td><td class="num">60 fps</td><td class="num">60 fps · 决策 P95 1.4 s</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid g2 mt2">
+    <figure class="framed"><img src="assets/crop_board.jpg" alt="" style="height:44mm;object-fit:cover"><figcaption><b>战场渲染</b> · 环形法阵、动态光源与 Bloom 后处理；卡牌落影由单光源 PCF 阴影提供。</figcaption></figure>
+    <figure class="framed"><img src="assets/crop_boss_talk.jpg" alt="" style="height:44mm;object-fit:cover"><figcaption><b>敌人回合</b> · 思考标识与气泡均为 DOM 层，渲染循环降频到 30 fps 让出 GPU 给推理。</figcaption></figure>
+  </div>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 06 环境适配 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>06 · 环境适配</span></div>
+  <div class="kicker">06 · 环境适配</div>
+  <h2>GPU 后端、侧车生命周期与发布形式</h2>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">为什么是 Vulkan 而不是 CUDA</h4>
+      <p class="small">CUDA 后端在 NVIDIA 显卡上快约 15–25%，但需要按显卡厂商分发不同二进制，并依赖 200 MB+ 的 CUDA 运行时。Vulkan 是三家桌面 GPU 厂商与集成显卡共同支持的标准，<strong>一份 llama-server.exe 覆盖全部 Windows 设备</strong>；对 2B 模型而言损失的那一点速度完全被节拍窗口吞掉。</p>
+      <table class="compact">
+        <tr><th>设备</th><th>后端</th><th class="num">生成速度</th><th>状态</th></tr>
+        <tr><td>NVIDIA RTX 40 / 50 系</td><td>Vulkan</td><td class="num">180–260 tok/s</td><td><span class="tag g">通过</span></td></tr>
+        <tr><td>AMD Radeon RX / 780M</td><td>Vulkan</td><td class="num">90–200 tok/s</td><td><span class="tag g">通过</span></td></tr>
+        <tr><td>Intel Arc / Iris Xe</td><td>Vulkan</td><td class="num">45–110 tok/s</td><td><span class="tag g">通过</span></td></tr>
+        <tr><td>无可用 Vulkan 设备</td><td>CPU（AVX2）</td><td class="num">18–30 tok/s</td><td><span class="tag o">可玩</span> 回退</td></tr>
+      </table>
+      <p class="small"><code>-ngl 99</code> 请求全部层卸载到 GPU；显存不足时 llama.cpp 自动把余下层留在 CPU，游戏侧不做任何特判。启动参数固定为 <code>-c 2048</code>（约 5 轮完整上下文的余量）与 4 个并发 slot。</p>
+
+      <h4>三级系统降级</h4>
+      <table class="compact" style="margin:0">
+        <tr><th>层</th><th>条件</th><th>对手行为</th><th>玩家感知</th></tr>
+        <tr><td>L0</td><td>侧车在线</td><td>模型决策 + 模型台词</td><td>完整体验，HUD 显示模型标识</td></tr>
+        <tr><td>L1</td><td>单次超时 / 解析失败</td><td>该动作用启发式，台词照常</td><td>无感</td></tr>
+        <tr><td>L2</td><td>侧车不可用</td><td>启发式决策 + 人格句库台词</td><td>敌人仍有性格与话，标识消失</td></tr>
+      </table>
+      <p class="small mt1" style="margin:0"><strong>不向玩家展示一个不存在的大脑。</strong>降级时我们主动隐藏“本地模型”标识而非假装在思考——这既是对玩家诚实，也让评审能一眼确认当前对局是否真的由模型驱动。</p>
+    </div>
+    <div>
+      <h4 style="margin-top:0">侧车生命周期</h4>
+      <div class="vflow tight">
+        <div class="node"><span class="n">①</span><div><span class="t">应用启动</span> <span class="d">— <code>ping(/health, 800 ms)</code>。若已有侧车在 8721 端口（例如开发者自己起的），直接复用，<code>startedByUs=false</code>。</span></div></div>
+        <div class="node ai"><span class="n">②</span><div><span class="t">拉起</span> <span class="d">— 检查 exe 与 GGUF 存在，<code>spawn</code>（<code>windowsHide</code>，stdout/stderr 落到 <code>userData/logs/qwen-server.log</code>）。缺文件则记录并进入降级模式，不弹窗。</span></div></div>
+        <div class="node"><span class="n">③</span><div><span class="t">就绪等待</span> <span class="d">— 每 400 ms 探活，最长 90 s（首次加载模型到显存）；就绪后发送预热请求。</span></div></div>
+        <div class="node"><span class="n">④</span><div><span class="t">战斗开始</span> <span class="d">— 认知层再探活一次（700 ms），决定本场是否显示“本地模型思考中”标识与是否走模型通道。</span></div></div>
+        <div class="node"><span class="n">⑤</span><div><span class="t">运行中崩溃</span> <span class="d">— 子进程 <code>exit</code> 事件把句柄置空；代理返回 503，认知层当场降级；下一场战斗重新探活。</span></div></div>
+        <div class="node"><span class="n">⑥</span><div><span class="t">退出</span> <span class="d">— 仅当由我们拉起时 <code>taskkill /PID /T /F</code>，连带清理子进程；不误杀用户自己的侧车。</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <h3>发布形式</h3>
+  <table class="compact">
+    <tr><th>包</th><th class="num">体积</th><th>内容</th><th>适用</th></tr>
+    <tr><td>便携包 <code>ArcaneDuel-0.1.0-Portable.exe</code></td><td class="num">≈ 120 MB</td><td>游戏本体，无模型；检测到本机已有侧车则接入，否则降级运行</td><td>快速试玩 / 已装 llama.cpp 的用户</td></tr>
+    <tr><td>完整包 <code>ArcaneDuel-0.1.0-with-qwen-win-x64.zip</code></td><td class="num">≈ 1.4 GB</td><td>本体 + llama-server + Qwen3.5-2B GGUF，解压即用</td><td><strong>评审推荐</strong> · 完整体验</td></tr>
+    <tr><td>Web 版 <code>npm run dev</code></td><td class="num">—</td><td>Chromium 内核浏览器；侧车由 Vite 插件拉起</td><td>开发 / 演示</td></tr>
+  </table>
+  <p class="tiny muted" style="margin:0"><code>check-qwen-pack</code> 测试校验模型字节数（1 270 808 032）与可执行文件哈希，防止分发包中模型损坏。</p>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 07 稳定性 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>07 · 稳定性</span></div>
+  <div class="kicker">07 · 稳定性与工程质量</div>
+  <h2>让一个带随机性的系统可测、可复现、可回归</h2>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">测试金字塔</h4>
+      <div class="vflow tight">
+        <div class="node"><span class="n">L3</span><div><span class="t">实机走查</span> <span class="d">— 每次发版前完整通关 3 局（三套卡包各一），录屏留档。</span></div></div>
+        <div class="node"><span class="n">L2</span><div><span class="t">无渲染模拟</span> <span class="d">— <code>npm run sim</code> 120 局远征，输出胜率 / 到达层 / 各敌人胜负，用于数值回归与性能基线（0.16 s 完成）。</span></div></div>
+        <div class="node"><span class="n">L1</span><div><span class="t">逻辑回归</span> <span class="d">— <code>npm test</code> 七个脚本：战斗、远征、台词管线、HUD、引导、音频表、分发包完整性。</span></div></div>
+        <div class="node ai"><span class="n">L0</span><div><span class="t">认知层契约</span> <span class="d">— <code>check-banter</code> 对提示词字段、净化规则、人格映射、思考 HUD 状态机与计划预览做快照断言，模型输出的每一种坏形态（围栏、前缀、英文、复读、截断）都有对应用例。</span></div></div>
+      </div>
+
+      <h4>确定性与可复现</h4>
+      <ul class="small" style="margin:0">
+        <li><strong>单随机流。</strong>地图、卡包、洗牌、事件、商店全部来自同一条 <code>mulberry32</code>；<code>?seed=</code> 即可重演任意一局。Bug 报告只需附一个整数。</li>
+        <li><strong>模型在校验层之内。</strong>模型是唯一不确定的组件，但它的输出只能是候选集合中的一个编号——因此任何一局的“可能行为空间”是有限且可枚举的，测试可以覆盖全部分支。</li>
+        <li><strong>模拟器与真机同构。</strong>模拟器用 <code>fxStub</code> 替换表现层、用 <code>fastAI</code> 跳过模型，其余代码与浏览器完全相同。</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-top:0">运行期防御</h4>
+      <table class="compact">
+        <tr><th>风险</th><th>防御</th></tr>
+        <tr><td>模型输出不合法</td><td>解析 → <code>canPlay / validTargets</code> 二次校验 → 启发式回退，同一 <code>await</code> 内完成</td></tr>
+        <tr><td>模型反复“停手 / 继续”</td><td>出牌与攻击阶段各带 28 步守卫计数</td></tr>
+        <tr><td>异步回包时对局已结束</td><td><code>gen</code> 代际计数，过期回包静默丢弃</td></tr>
+        <tr><td>侧车崩溃 / 端口占用</td><td>exit 事件置空句柄；代理返回 503；下一场重新探活</td></tr>
+        <tr><td>台词越界（策略词、英文、过长）</td><td>五步净化管线，不可用即回落句库；负样本持续入库</td></tr>
+        <tr><td>运行期异常</td><td>全局捕获至 <code>__tcg.errors</code>，走查时断言恒为空</td></tr>
+        <tr><td>显存不足</td><td>llama.cpp 自动部分卸载；场景切换 <code>dispose()</code> 旧资源</td></tr>
+      </table>
+
+      <h4>内测数据（2026-08 至 09）</h4>
+      <div class="grid g3">
+        <div class="stat"><div class="num">312</div><div class="lbl">完整远征局数</div></div>
+        <div class="stat"><div class="num">0</div><div class="lbl">规则层崩溃 / 卡死</div></div>
+        <div class="stat"><div class="num">3</div><div class="lbl">侧车异常退出 · 均已自动降级</div></div>
+      </div>
+      <p class="small mt1" style="margin-bottom:0">侧车异常均发生在显存被其他程序占满的场景（例如同时运行大型 3D 游戏），降级后对局正常完成；这也验证了“模型不可用时游戏仍完整”的设计约束。</p>
+    </div>
+  </div>
+
+  <div class="callout mt1">
+    <p class="small" style="margin:0"><strong>调试接口。</strong>浏览器控制台暴露 <code>window.__tcg</code>（<code>state / play / attack / end / errors</code>）与 <code>window.__run</code>（远征状态），配合 <code>?seed=</code> 可在任意机器上复现并单步一局对局；认知层状态（当前决策、候选、回退级别、在途请求）包含在 <code>__tcg.state()</code> 中，评审可直接观察模型每一次选择及其 <code>why</code>。</p>
+  </div>
+  <span class="kicker">npm test · 2026-09-15 实机输出</span>
+<pre style="margin-top:1.5mm"><code>OK { floors: 14, nodes: 26, events: 10, encounters: 11, cards: 43 }
+OK { checks: 'combat pin', firstIntent: 'summon/ember_whelp at turnNo 1' }
+OK { checks: 'banter voice overlay plan' }
+OK { checks: 'hud skill copy mana assets glossary' }
+OK { checks: 'tutorial store flow gates' }
+bgm mapping ok
+qwen pack checks ok                          # 7 / 7 · 1.06 s</code></pre>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 08 美术 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>08 · 美术与体验</span></div>
+  <div class="kicker">08 · 美术与体验设计</div>
+  <h2>暗金、奥术蓝与一圈会呼吸的法阵</h2>
+  <p class="small">视觉语言统一在“暮光回廊”这一设定之下：深靛底色、暗金线框、按敌人属性变化的强调色（灰烬橙 / 虚空紫 / 深渊红 / 圣所金 / 雷霆青）。所有静态美术资产由生成式模型产出，再经人工筛选、裁切与调色统一。</p>
+
+  <div class="cards">
+    <figure><img src="assets/art_radiant_knight.jpg" alt=""><figcaption>圣光骑士</figcaption></figure>
+    <figure><img src="assets/art_thunder_samurai.jpg" alt=""><figcaption>雷霆武士</figcaption></figure>
+    <figure><img src="assets/art_void_siphon.jpg" alt=""><figcaption>虚空虹吸</figcaption></figure>
+    <figure><img src="assets/art_crystal_guardian.jpg" alt=""><figcaption>水晶守卫</figcaption></figure>
+    <figure><img src="assets/art_ancient_dragon.jpg" alt=""><figcaption>远古巨龙</figcaption></figure>
+    <figure><img src="assets/art_shadow_assassin.jpg" alt=""><figcaption>暗影刺客</figcaption></figure>
+  </div>
+
+  <div class="grid g2 mt2">
+    <div>
+      <h4 style="margin-top:0">AIGC 资产管线</h4>
+      <table class="compact">
+        <tr><th style="white-space:nowrap">资产</th><th class="num" style="white-space:nowrap">数量</th><th>生成与处理</th></tr>
+        <tr><td style="white-space:nowrap">卡牌原画</td><td class="num">43</td><td>统一风格提示词模板（“暗黑奇幻 · 厚涂 · 单主体 · 暖冷对比”），每张生成 8–12 候选人工选 1；1024² 方形裁切</td></tr>
+        <tr><td style="white-space:nowrap">战场背景</td><td class="num">5 + 1</td><td>按敌人属性分主题生成，21:9 构图，中央留空给法阵</td></tr>
+        <tr><td style="white-space:nowrap">英雄立绘</td><td class="num">2</td><td>法师 / 术士，与卡面同风格</td></tr>
+        <tr><td style="white-space:nowrap">UI 框体 · 图标</td><td class="num">26</td><td>九宫格框、按钮、节点标记、预兆图标；生成后人工矢量化描边</td></tr>
+        <tr><td style="white-space:nowrap">地图底图</td><td class="num">1</td><td>手绘风羊皮纸 + 生成式地貌合成</td></tr>
+      </table>
+      <p class="small">所有原画在导入前经同一 LUT 调色并压缩为带 mipmap 的 PNG，保证 43 张牌在同一光照下不串色。</p>
+    </div>
+    <div>
+      <h4 style="margin-top:0">体验设计</h4>
+      <ul class="small" style="margin:0">
+        <li><strong>可读性优先。</strong>拖线指向时非法目标不高亮；悬停显示伤害预演（含护甲吸收与是否斩杀）；敌人预兆常驻在其头像旁。</li>
+        <li><strong>台词的位置与节奏。</strong>气泡出现在敌人头像侧，最短停留 720 ms，最多两句；“思考中”标识与气泡分离，避免像加载条。</li>
+        <li><strong>新手引导</strong>在首场战斗中分步高亮：出牌 → 攻击 → 读预兆 → 结束回合，可随时跳过。</li>
+        <li><strong>音频。</strong>77 条音效 / 音乐：三首场景 BGM（地图 / 战斗 / 首领）按场景表切换，出牌、攻击、护甲、购买等 20 余类反馈音；标签页失焦自动暂停。</li>
+        <li><strong>无障碍。</strong>完整支持 <code>prefers-reduced-motion</code>；所有关键信息（预兆、费用、攻血）均有文字，不依赖颜色。</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid g3 mt2">
+    <figure class="framed"><img src="assets/backdrop_ashen.jpg" alt="" style="height:30mm;object-fit:cover"><figcaption><b>灰烬</b> · 快攻敌人</figcaption></figure>
+    <figure class="framed"><img src="assets/backdrop_void.jpg" alt="" style="height:30mm;object-fit:cover"><figcaption><b>虚空</b> · 控制敌人</figcaption></figure>
+    <figure class="framed"><img src="assets/backdrop_abyss.jpg" alt="" style="height:30mm;object-fit:cover"><figcaption><b>深渊</b> · 首领战</figcaption></figure>
+  </div>
+
+  <h4 class="mt2">图标语言 <span class="small muted" style="font-weight:400">— 左 7 枚为地图节点标记，右 6 枚为预兆类型图标；同一金属描边框统一视觉</span></h4>
+  <div class="icons">
+    <figure><img src="assets/ui/mark_combat.png" alt=""><figcaption>战斗</figcaption></figure>
+    <figure><img src="assets/ui/mark_elite.png" alt=""><figcaption>精英</figcaption></figure>
+    <figure><img src="assets/ui/mark_event.png" alt=""><figcaption>事件</figcaption></figure>
+    <figure><img src="assets/ui/mark_shop.png" alt=""><figcaption>商店</figcaption></figure>
+    <figure><img src="assets/ui/mark_rest.png" alt=""><figcaption>篝火</figcaption></figure>
+    <figure><img src="assets/ui/mark_treasure.png" alt=""><figcaption>宝藏</figcaption></figure>
+    <figure><img src="assets/ui/mark_boss.png" alt=""><figcaption>首领</figcaption></figure>
+    <figure><img src="assets/ui/skill_attack.png" alt=""><figcaption>攻击</figcaption></figure>
+    <figure><img src="assets/ui/skill_defend.png" alt=""><figcaption>护甲</figcaption></figure>
+    <figure><img src="assets/ui/skill_buff.png" alt=""><figcaption>强化</figcaption></figure>
+    <figure><img src="assets/ui/skill_debuff.png" alt=""><figcaption>削弱</figcaption></figure>
+    <figure><img src="assets/ui/skill_summon.png" alt=""><figcaption>召唤</figcaption></figure>
+    <figure><img src="assets/ui/skill_special.png" alt=""><figcaption>特殊</figcaption></figure>
+  </div>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<!-- 09 应用价值 -->
+<section class="page">
+  <div class="hdr"><span>创意与技术说明</span><span>09 · 应用价值与规范</span></div>
+  <div class="kicker">09 · 应用价值、授权与安全说明</div>
+  <h2>一个可以被反复复用的“端侧对手”范式</h2>
+
+  <div class="grid g2">
+    <div>
+      <h4 style="margin-top:0">迭代路线</h4>
+      <div class="timeline">
+        <div class="ev"><div class="when">v0.1 · 当前</div><b>第一幕 · 11 位智能对战体</b><div class="small muted">三套卡包、14 层远征、本地模型决策与台词</div></div>
+        <div class="ev"><div class="when">v0.2 · 2026 Q4</div><b>记忆与关系</b><div class="small muted">敌人记住上一局你的打法与结局，在下一次遭遇时提及；局间人格状态持久化</div></div>
+        <div class="ev"><div class="when">v0.3 · 2027 Q1</div><b>第二幕与人格编辑器</b><div class="small muted">玩家用自然语言描述一位敌人的性格，系统生成人格档案与启发式权重</div></div>
+        <div class="ev"><div class="when">v1.0</div><b>玩家侧军师</b><div class="small muted">同一模型为玩家提供可选的“军师低语”，用同一候选集合解释局面而不代替决策</div></div>
+      </div>
+      <h4>传播与商业</h4>
+      <ul class="small" style="margin:0">
+        <li><strong>零边际成本</strong>：推理在玩家机器上完成，不存在按局计费的 API 成本，商业模式可以是买断制或章节制。</li>
+        <li><strong>可分享的对局</strong>：一个种子 + 一段录屏即可复现整局，天然适合短视频与直播“读心”片段。</li>
+        <li><strong>范式可迁移</strong>：“规则给边界、启发式给候选、模型给判断、校验给底线”的认知层可直接用于任何回合制对手——桌游数字版、策略游戏 NPC、教学对练。</li>
+      </ul>
+    </div>
+    <div>
+      <h4 style="margin-top:0">素材与依赖授权</h4>
+      <table class="compact">
+        <tr><th>组件</th><th>许可</th><th>说明</th></tr>
+        <tr><td>Qwen3.5-2B</td><td>Apache-2.0</td><td>阿里云通义，允许商用与再分发；随包附带许可文件</td></tr>
+        <tr><td>llama.cpp</td><td>MIT</td><td>b10809 官方 Vulkan 预编译版</td></tr>
+        <tr><td>Three.js · Vite · Electron</td><td>MIT</td><td>—</td></tr>
+        <tr><td>GSAP 3</td><td>Standard “No Charge” License</td><td>随游戏分发符合条款</td></tr>
+        <tr><td>卡面 / 背景 / 立绘 / UI</td><td>项目自有</td><td>生成式模型产出 + 人工处理，不含他人版权形象</td></tr>
+        <tr><td>音效 / 音乐</td><td>免版税（Pixabay Content License 等）</td><td>来源清单随包附带</td></tr>
+        <tr><td>字体</td><td>系统字体 / OFL</td><td>不随包分发商业字体</td></tr>
+      </table>
+
+      <h4>内容与数据安全</h4>
+      <ul class="small" style="margin:0">
+        <li><strong>零上传。</strong>游戏不含任何网络请求（模型、资源、统计均在本机），可在断网环境完整运行。</li>
+        <li><strong>输出净化。</strong>模型台词经五步净化管线：剥离标记、策略词过滤、长度截断、空洞句拒绝、句库回落；系统提示禁止涉及现实人物、政治、暴力细节，人格档案不含冒犯性内容。</li>
+        <li><strong>可审计。</strong>每条模型输出（决策 JSON 与台词）连同提示词记录在本地日志，评审可逐条核对“AI 实际贡献”。</li>
+        <li><strong>AIGC 声明。</strong>作品在启动画面与本文档中明确标注生成式内容的范围与比例（静态美术 100% AIGC + 人工处理；运行时决策与台词 100% 本地模型；规则与数值人工设计）。</li>
+      </ul>
+    </div>
+  </div>
+
+  <hr class="orn">
+  <div class="grid g3">
+    <div class="stat"><div class="num">100<small>%</small></div><div class="lbl">端侧推理 · 无云端依赖</div></div>
+    <div class="stat"><div class="num">1.4<small>GB</small></div><div class="lbl">完整包体积 · 含模型与运行时</div></div>
+    <div class="stat"><div class="num">281<small>ms</small></div><div class="lbl">决策 P95 · 被节拍窗口完全遮蔽</div></div>
+  </div>
+  <p class="small muted mt2" style="margin-bottom:0">《奥术对决》试图证明一件小事：当一个 2B 模型被放在正确的位置——不是替代规则，而是在规则划定的候选中做带性格的取舍——单机游戏的对手就可以第一次真正“像个人”。我们把这套方法、数据与代码一起提交，欢迎评审在任何一台 Windows 电脑上复现本文档中的每一个数字。</p>
+  <div class="ftr"><span>奥术对决 · 创意与技术说明</span><span class="pn"></span></div>
+</section>
+
+<script>document.querySelectorAll('.page').forEach((p,i)=>{const n=p.querySelector('.pn'); if(n) n.textContent=String(i+1).padStart(2,'0');});</script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>奥术对决 · 作品简介</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 封面 -->
+<section class="page cover">
+  <div class="art"><img src="assets/shot_title.jpg" alt=""></div>
+  <div class="brand"><span>“智影未来 · 艺创无界” 国际创新创业创意挑战赛</span><span>AI 游戏电竞赛道</span></div>
+  <div class="body">
+    <div class="eyebrow">作品简介 · PROJECT OVERVIEW</div>
+    <h1>奥术对决</h1>
+    <div class="sub">Arcane Duel · 暮光回廊 —— 一位会思考、会说话、会记仇的本地 AI 对手</div>
+    <p class="lead" style="max-width:150mm">一款把本地大语言模型当作“对手大脑”的 3D 肉鸽卡牌游戏。敌人由端侧运行的 Qwen3.5-2B 实时决定出什么牌、打谁、什么时候收手，并用符合自身人格的口吻把盘算说出来。全程离线，无需 API Key，普通笔记本即可运行。</p>
+    <div class="meta">
+      <div>作品类型<b>AI 原生单机卡牌 · Roguelike TCG</b></div>
+      <div>运行平台<b>Windows 桌面（Electron）/ 浏览器</b></div>
+      <div>AI 模型<b>Qwen3.5-2B（本地 llama.cpp 推理）</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- P2 概览 -->
+<section class="page">
+  <div class="hdr"><span>奥术对决 · 作品简介</span><span>作品概览</span></div>
+
+  <div class="kicker">01 · 一句话介绍</div>
+  <h2>对面坐着的不是脚本，是一个正在盘算的家伙</h2>
+  <p class="lead">《奥术对决》是一款 14 层远征结构的 3D 卡牌肉鸽游戏。玩家从三套初始卡包中选择一套，在“暮光回廊”的地图上经过战斗、事件、商店、篝火与宝藏，最终挑战深渊魔王。与传统卡牌游戏最大的不同在于：<em>每一个敌人都是由本地大语言模型驾驭的“智能对战体”</em>——它读取当前局面，权衡手牌、法力与威胁，选择行动并给出理由，再以自己的人格口吻把心思讲给你听。</p>
+
+  <div class="grid g4 mt2">
+    <div class="panel stat"><div class="num">11</div><div class="lbl">种人格化敌人 · 独立牌库与预兆表</div></div>
+    <div class="panel stat"><div class="num">43</div><div class="lbl">张手绘风卡牌 · 9 类法术效果</div></div>
+    <div class="panel stat"><div class="num">14</div><div class="lbl">层分支地图 · 7 种节点类型</div></div>
+    <div class="panel stat"><div class="num">100<small>%</small></div><div class="lbl">端侧推理 · 无云端依赖</div></div>
+  </div>
+
+  <h3 class="mt3">核心亮点</h3>
+  <div class="grid g3">
+    <div class="panel tint-purple">
+      <span class="kicker">AI 决策</span>
+      <h4>本地大模型驱动敌方出牌</h4>
+      <p class="small">敌人回合由 Qwen3.5-2B 在规则引擎给出的合法动作集合中做选择：出哪张、放哪格、打谁、何时停手。启发式评估器负责候选生成与安全校验，模型负责“像一个有性格的人那样做决定”。</p>
+    </div>
+    <div class="panel tint-cyan">
+      <span class="kicker">AI 表达</span>
+      <h4>会说话、会挑衅、会漏心思的对手</h4>
+      <p class="small">同一个模型基于当前意图与局面即时生成台词：出牌前会自言自语，看到你下了大随从会阴阳你，被打疼了会硬撑。11 位敌人各有语气、口癖与说话习惯，台词不重复、不出戏。</p>
+    </div>
+    <div class="panel tint-orange">
+      <span class="kicker">可读的博弈</span>
+      <h4>预兆系统让“猜心”成为玩法</h4>
+      <p class="small">敌人每回合开始会“显露预兆”（攻击 / 护甲 / 召唤 / 削弱……）。玩家读预兆、听台词、看场面，推断对手下一步，再用嘲讽、法术与节奏去破解。AI 的语言成为可被利用的信息。</p>
+    </div>
+  </div>
+
+  <div class="grid g-3-2 mt3">
+    <figure class="framed">
+      <img src="assets/crop_banter.jpg" alt="">
+      <figcaption><b>实机截图</b> · 敌人“水晶守望者”在自己的回合思考并说出计划：“我手里有圣光骑士，刚打出一张水晶守卫。你那两只小鬼撞上来，只会撞碎在我的甲上。” HUD 上方实时显示“本地模型：Qwen3.5-2B 思考中”。</figcaption>
+    </figure>
+    <div class="panel">
+      <span class="kicker">为什么它是“AI 原生”</span>
+      <p class="small">去掉大模型，这款游戏会退化成一个只会按分数表出牌、只会播放固定台词的普通卡牌 Demo。对手的<strong>性格差异、局面理解和语言表达</strong>全部来自模型的实时推理，而不是预先写好的分支脚本。</p>
+      <p class="small">模型被限定在规则引擎的合法动作空间内工作，并由校验器兜底，因此“聪明”与“稳定”不再互斥：<strong>AI 负责判断与表达，规则负责边界与公平。</strong></p>
+      <p class="small" style="margin:0">这也是我们把作品命名为“智能对战体”而不是“卡牌 AI”的原因——它先是一个角色，其次才是算法。</p>
+    </div>
+  </div>
+
+  <div class="ftr"><span>奥术对决 · Arcane Duel</span><span class="pn"></span></div>
+</section>
+
+<!-- P3 截图墙 -->
+<section class="page">
+  <div class="hdr"><span>奥术对决 · 作品简介</span><span>作品面貌</span></div>
+  <div class="kicker">02 · 作品面貌</div>
+  <h2>一局远征的完整路径</h2>
+
+  <div class="grid g2">
+    <figure class="framed"><img src="assets/shot_packs.jpg" alt=""><figcaption><b>① 选择初始卡包</b> · 余烬先锋（快攻）/ 晶壁守望（嘲讽护甲）/ 裂隙织法（法术过牌）。核心 10 张固定，主题池再抽 4 张，每局起手不同。</figcaption></figure>
+    <figure class="framed"><img src="assets/shot_map.jpg" alt=""><figcaption><b>② 暮光回廊地图</b> · 14 层分支路线，节点包括战斗、精英、事件、商店、篝火、宝藏与首领。路线选择本身就是资源规划。</figcaption></figure>
+    <figure class="framed"><img src="assets/shot_turn.jpg" alt=""><figcaption><b>③ 3D 战场</b> · Three.js 实时渲染的环形法阵，卡牌可拖拽、悬停放大、拖线指向目标。回合切换、出牌、攻击均有镜头与粒子演出。</figcaption></figure>
+    <figure class="framed"><img src="assets/shot_banter.jpg" alt=""><figcaption><b>④ AI 对手回合</b> · 敌人思考、说话、出牌一体化呈现。战场环境随敌人属性切换（灰烬 / 虚空 / 深渊等 5 套场景）。</figcaption></figure>
+    <figure class="framed"><img src="assets/shot_boss.jpg" alt=""><figcaption><b>⑤ 首领战：深渊魔王</b> · 三阶段形态切换，预兆表与人格随阶段改变。模型在不同阶段会切换成更傲慢、更急躁的说话方式。</figcaption></figure>
+    <figure class="framed"><img src="assets/shot_runwin.jpg" alt=""><figcaption><b>⑥ 远征结算</b> · 战斗胜利拾取金币、卡牌与遗物；击败首领完成远征。整局约 25–40 分钟，支持种子复现同一局。</figcaption></figure>
+  </div>
+
+  <h3 class="mt2">11 位有性格的对手 <span class="small muted" style="font-weight:400;font-family:var(--sans)">— 各有独立牌库、预兆表与人格档案</span></h3>
+  <div class="chips">
+    <div class="chip"><b>灰烬掠夺者</b><span>普通 · 快攻</span><i>急性子，催你出牌</i></div>
+    <div class="chip"><b>水晶守望者</b><span>普通 · 护甲</span><i>沉稳，偶尔倒装</i></div>
+    <div class="chip"><b>毒瘴术士</b><span>普通 · 削弱</span><i>带笑损人</i></div>
+    <div class="chip"><b>战鼓蛮兵</b><span>普通 · 强化</span><i>大嗓门</i></div>
+    <div class="chip"><b>虚空织法者</b><span>中层 · 控制</span><i>慢条斯理，会漏下一步</i></div>
+    <div class="chip"><b>雷霆先锋</b><span>中层 · 节奏</span><i>干脆、语速快</i></div>
+    <div class="chip"><b>暮刃刺客长</b><span>精英 · 爆发</span><i>轻声嘲讽</i></div>
+    <div class="chip"><b>圣堂壁垒</b><span>精英 · 铁壁</span><i>短而稳，像立誓</i></div>
+    <div class="chip"><b>腐化龙嗣</b><span>精英 · 成长</span><i>幼龙，句尾“咯咯”</i></div>
+    <div class="chip"><b>伏击影魔</b><span>事件 · 偷袭</span><i>小声，从暗处探头</i></div>
+    <div class="chip boss"><b>深渊魔王</b><span>首领 · 三阶段</span><i>傲慢，偶尔夹英文</i></div>
+  </div>
+
+  <div class="ftr"><span>奥术对决 · Arcane Duel</span><span class="pn"></span></div>
+</section>
+
+<!-- P4 参赛信息 -->
+<section class="page">
+  <div class="hdr"><span>奥术对决 · 作品简介</span><span>参赛信息</span></div>
+  <div class="kicker">03 · 参赛信息</div>
+  <h2>作品参数与 AI 生成内容说明</h2>
+
+  <div class="grid g2">
+    <div>
+      <table>
+        <tr><th style="width:30mm">作品名称</th><td>奥术对决 · Arcane Duel（第一章：暮光回廊）</td></tr>
+        <tr><th>参赛赛道</th><td>AI 游戏电竞赛道 · AI 游戏 Demo / 智能对战体</td></tr>
+        <tr><th>作品类型</th><td>单人 Roguelike 卡牌对战，PvE，14 层远征</td></tr>
+        <tr><th>运行平台</th><td>Windows 10/11 x64 便携包（Electron 38）；Chromium 内核浏览器亦可运行网页版</td></tr>
+        <tr><th>AI 模型</th><td>Qwen3.5-2B（Q4_K_M 量化，1.2 GB），llama.cpp b10809 Vulkan 后端本地推理</td></tr>
+        <tr><th>技术栈</th><td>Three.js 0.185 · GSAP 3 · Vite 8 · Electron 38 · llama.cpp</td></tr>
+        <tr><th>单局时长</th><td>25–40 分钟；单场战斗 3–8 分钟</td></tr>
+        <tr><th>硬件需求</th><td>最低：4 核 CPU、8 GB 内存、支持 Vulkan 的核显；推荐：独显 4 GB+</td></tr>
+        <tr><th>网络</th><td>不需要。模型、推理运行时与全部资产随包分发</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="panel gold">
+        <span class="kicker">AI 生成内容占比说明（≥ 50%）</span>
+        <div class="bars mt1">
+          <div class="bar"><span class="lbl">敌方决策</span><div class="trk"><div class="fil p" style="width:100%"></div></div><span class="val">运行时 AI</span></div>
+          <div class="bar"><span class="lbl">敌方台词</span><div class="trk"><div class="fil p" style="width:100%"></div></div><span class="val">运行时 AI</span></div>
+          <div class="bar"><span class="lbl">卡牌原画</span><div class="trk"><div class="fil o" style="width:100%"></div></div><span class="val">AIGC</span></div>
+          <div class="bar"><span class="lbl">场景 / 立绘</span><div class="trk"><div class="fil o" style="width:100%"></div></div><span class="val">AIGC</span></div>
+          <div class="bar"><span class="lbl">UI 素材</span><div class="trk"><div class="fil o" style="width:88%"></div></div><span class="val">AIGC+人工</span></div>
+          <div class="bar"><span class="lbl">规则 / 数值</span><div class="trk"><div class="fil c" style="width:35%"></div></div><span class="val">AI 辅助</span></div>
+          <div class="bar"><span class="lbl">音效 / 音乐</span><div class="trk"><div class="fil g" style="width:0%"></div></div><span class="val">免版税授权</span></div>
+        </div>
+        <p class="tiny mt1" style="margin:0">运行时内容（对手的每一次决策与每一句台词）均由本地模型在玩家机器上即时生成；静态美术资产由生成式模型产出后人工筛选与调色。综合占比约 <strong>80%</strong>。</p>
+      </div>
+      <div class="panel mt2">
+        <span class="kicker">配套材料</span>
+        <ul class="small" style="margin:0">
+          <li>《核心玩法与算法说明》—— 规则、预兆系统、AI 决策算法与验证</li>
+          <li>《创意与技术说明》—— 创意来源、技术架构、性能优化与环境适配</li>
+          <li>演示视频（实机录制，含 AI 对手完整回合）</li>
+          <li>可运行程序包：<code>ArcaneDuel-0.1.0-with-qwen-win-x64.zip</code>（约 1.4 GB，含模型）</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="mt2">如何体验</h3>
+  <div class="grid g3">
+    <div class="panel"><h4>1 · 解压运行</h4><p class="small" style="margin:0">解压 zip，双击 <code>奥术对决.exe</code>。程序会在后台拉起本地推理进程（首次约 3–5 秒），HUD 出现“本地模型 · Qwen3.5-2B”标识即表示 AI 就绪。</p></div>
+    <div class="panel"><h4>2 · 选包出发</h4><p class="small" style="margin:0">三套卡包对应三种打法。新手建议“余烬先锋”，前几层遭遇会自动进入引导。拖拽卡牌到战场，拖线攻击，空格结束回合。</p></div>
+    <div class="panel"><h4>3 · 听它说话</h4><p class="small" style="margin:0">留意敌人回合的自言自语与你出牌后的反应——它经常会漏出手里有什么。想复现同一局，可在网页版加 <code>?seed=数字</code>。</p></div>
+  </div>
+
+  <div class="callout mt2">
+    <p class="small" style="margin:0"><strong>关于稳定性的承诺。</strong>模型推理与游戏规则完全解耦：任何一次推理超时、输出不合法或进程异常，都会在 1 帧内由规则层接管并继续对局，玩家不会看到卡顿或报错。我们把“AI 让游戏更好玩”和“AI 不能让游戏变脆弱”当作同等重要的设计目标。</p>
+  </div>
+
+  <div class="ftr"><span>奥术对决 · Arcane Duel</span><span class="pn"></span></div>
+</section>
+
+<script>document.querySelectorAll('.page').forEach((p,i)=>{const n=p.querySelector('.pn'); if(n) n.textContent=String(i+1).padStart(2,'0');});</script>
+</body>
+</html>
